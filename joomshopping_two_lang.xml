@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension version="1.6" type="plugin" group="search" method="upgrade">
+    <name>Поиск - JoomShopping</name>
+    <author>Gartes</author>
+    <creationDate>01.04.2020</creationDate>
+    <copyright></copyright>
+    <license>Open Source License, GNU GPL</license>
+    <authorEmail>sad.net79@gmail.com</authorEmail>
+    <authorUrl>https://back-end.ga/</authorUrl>
+    <version>0.0.1</version>
+    <description>Search plugin joomshopping two languages</description>
+    <files>
+        <folder>language</folder>
+        <filename plugin="joomshopping_two_lang">joomshopping_two_lang.php</filename>
+        <filename>joomshopping_two_lang_update.xml</filename>
+        <filename>README.md</filename>
+    </files>
+
+
+    <config>
+        <fields name="params">
+            <fieldset name="basic">
+                <field name="search_limit" type="text"
+                       default="50"
+                       description="JFIELD_PLG_SEARCH_SEARCHLIMIT_DESC"
+                       label="JFIELD_PLG_SEARCH_SEARCHLIMIT_LABEL"
+                       size="5"
+                />
+                <field name="exclude_categorys" type="text"
+                       default=""
+                       description="ID категорий, разделенные запятыми"
+                       label="Исключить категории"
+                       size="40"
+                />
+
+                <field
+                        name="search_description"
+                        type="radio"
+                        default="1"
+                        class="btn-group btn-group-yesno"
+                        description="SEARCH DESCRIPTION TIP"
+                        label="SEARCH DESCRIPTION"
+                >
+                    <option value="1">JYES</option>
+                    <option value="0">JNO</option>
+                </field>
+
+                <field
+                        name="search_description_short"
+                        type="radio"
+                        default="1"
+                        class="btn-group btn-group-yesno"
+                        description="SEARCH DESCRIPTION SHORT TIP"
+                        label="SEARCH DESCRIPTION SHORT"
+                >
+                    <option value="1">JYES</option>
+                    <option value="0">JNO</option>
+                </field>
+
+                <field
+                        name="select_desc"
+                        type="list"
+                        default="0"
+                        description="SELECT DESCRIPTION TIP"
+                        label="SELECT DESCRIPTION"
+                >
+                    <option value="0">CONCATENATE</option>
+                    <option value="1">SHORT ONLY</option>
+                    <option value="2">FULL ONLY</option>
+                    <option value="3">JNO</option>
+                </field>
+
+                <field
+                        name="addimages"
+                        type="radio"
+                        default="1"
+                        class="btn-group btn-group-yesno"
+                        description="ADD ITEM IMAGE TIP"
+                        label="ADD ITEM IMAGE"
+                >
+                    <option value="1">JYES</option>
+                    <option value="0">JNO</option>
+                </field>
+            </fieldset>
+        </fields>
+    </config>
+
+	<updateservers>
+		<server type="extension" name="JoomShopping - Search plugin joomshopping two languages update">https://raw.githubusercontent.com/Gartes-JoomShopping/plg_joomshopping_two_lang/master/joomshopping_two_lang_update.xml</server>
+	</updateservers>
+
+
+</extension>
+<!--
+INTAL :
+https://github.com/Gartes-JoomShopping/plg_joomshopping_two_lang/archive/master.zip
+-->

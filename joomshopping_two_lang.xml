@@ -10,7 +10,9 @@
     <version>0.0.1</version>
     <description>Search plugin joomshopping two languages</description>
     <files>
+        <folder>Helpers</folder>
         <folder>language</folder>
+        <folder>Libraries</folder>
         <filename plugin="joomshopping_two_lang">joomshopping_two_lang.php</filename>
         <filename>joomshopping_two_lang_update.xml</filename>
         <filename>README.md</filename>

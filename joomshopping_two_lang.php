@@ -25,9 +25,15 @@ jimport('joomla.plugin.plugin');
 /*JPlugin::loadLanguage( 'plg_search_joomshopping' );*/
 
 class plgSearchJoomshopping_two_lang extends JPlugin {
-
-
-    function onContentSearchAreas(){
+	
+	
+	/**
+	 * @var \JoomshoppingTwoLang\Helpers\helper
+	 * @since version
+	 */
+	private $HelperString;
+	
+	function onContentSearchAreas(){
         static $areas = array(
             'joomshopping' => 'Товары'
         );
@@ -37,6 +43,8 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 
     function onContentSearch( $text, $phrase='', $ordering='', $areas=null )
     {
+	    
+    	
         require_once (JPATH_SITE.'/components/com_jshopping/lib/factory.php'); 
         require_once (JPATH_SITE.'/components/com_jshopping/lib/functions.php');      
         
@@ -50,24 +58,24 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
             }
         }
         
-        
-        
         $limit = $this->params->def( 'search_limit', 50 );
         $search_description = $this->params->def( 'search_description', 1 );
         $search_description_short = $this->params->def( 'search_description_short', 1 );
         $select_desc = $this->params->def( 'select_desc', 0 );
 
-		$text = JString::strtolower($text);
-		$text = preg_replace('/[^\da-zа-яё]/u', ' ', $text);
+		$text = \Joomla\String\StringHelper::strtolower($text);
+	    $text = preg_replace('/[^\da-zа-яё,]/u', ' ', $text);
 		$text = preg_replace('/(\d+)/u', ' ${1} ', $text);
-		$text = preg_replace('/\s+/u', ' ', JString::trim($text));
+		$text = preg_replace('/\s+/u', ' ', \Joomla\String\StringHelper::trim($text));
         if ($text == '') {
             return array();
         }
 		$full_text = $text;
 	
-	
-	    die(__FILE__ .' '. __LINE__ );
+        
+        
+        
+  
      
 		$wordsWithoutNumbers = array();
 		$words = explode(' ', $text);
@@ -94,9 +102,7 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 			$revalent_1[] = $prod_keywords . ' like ' . $db->quote('%' . $value . '%', false);
 		}
 		$revalent_1 = implode(' and ', $revalent_1);
-
 		$revalent_2 = $prod_keywords . ' like ' . $db->quote('%' . implode('%', $wordsWithoutNumbers) . '%', false);
-		
 		$revalent_3 = array();
 		foreach ($wordsWithoutNumbers as $key=>$value) {
 			$revalent_3[] = $prod_keywords . ' like ' . $db->quote('%' . $value . '%', false);
@@ -110,14 +116,32 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 		$revalent_4 = implode(' or ', $revalent_4);
 		
 		$revalent = 'if((' . $revalent_0 . '), 0, if((' . $revalent_1 . '), 1, if((' . $revalent_2 . '), 2, if((' . $revalent_3 . '), 3, if((' . $revalent_4 . '), 4, 5)))))';
-		
+	
+	    JLoader::registerNamespace('JoomshoppingTwoLang\Helpers',JPATH_PLUGINS.'/search/joomshopping_two_lang/Helpers',$reset=false,$prepend=false,$type='psr4');
+	    $this->HelperString = \JoomshoppingTwoLang\Helpers\HelperString::instance();
+	    $full_text = $this->HelperString->getCorrect( $full_text ) ;
+	    
+	    
+	    
 		$where = array('product_ean = ' . $db->quote($full_text));
 		foreach ($words as $key=>$value) {
-			$where[] = $prod_name . ' like ' . $db->quote('%' . $value . '%', false);
-			$where[] = $prod_keywords . ' like ' . $db->quote('%' . $value . '%', false);
+			
+			$valueCorrect = $this->HelperString->getCorrect( $value ) ;
+			$where[] = $prod_name . ' LIKE ' . $db->quote('%' . $valueCorrect . '%', false);
+			$where[] = $prod_keywords . ' LIKE ' . $db->quote('%' . $valueCorrect . '%', false);
+
+			# Переключить в русскую расладку
+			$valueRU = $this->HelperString->correctStringRU( $value ) ;
+			$where[] = $prod_name . ' like ' . $db->quote('%' . $valueRU . '%', false);
+			$where[] = $prod_keywords . ' like ' . $db->quote('%' . $valueRU . '%', false);
+			
 		}
+	
+		
+		
 		$where = '('. implode(' or ', $where) . ')';
-        
+		
+		
 		$query = $db->getQuery(true);
         $query->select("prod.product_id AS slug,
 			pr_cat.category_id AS catslug,
@@ -166,18 +190,7 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 		
 		$query->select($revalent . ' as revalent');
 		
-		$exclude_categorys = $this->params->get('exclude_categorys', '');
-		if ($exclude_categorys !== '') {
-			$exclude_categorys = explode(',', $exclude_categorys);
-			foreach ($exclude_categorys as $key=>$id) {
-				$id = (int)trim($id);
-				if ($id > 0) {
-					$exclude_categorys[$key] = $id;
-				} else {
-					unset($exclude_categorys[$key]);
-				}
-			}
-		}
+		
 				
 		$query->from("#__jshopping_products AS prod");
         $query->join('LEFT', $db->quoteName('#__jshopping_products_to_categories')." AS pr_cat ON pr_cat.product_id = prod.product_id");
@@ -185,20 +198,31 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
         $query->where($where);
         $query->where("prod.product_publish = '1'");
 		$query->where("cat.category_publish = '1'");
-		if ($exclude_categorys) {
-			$query->where("cat.category_id NOT IN (" . implode(',', $exclude_categorys) . ')');
-		}
-		if ($category_id = JFactory::getApplication()->input->getInt('category_id')) {
+	
+		# Исключение категорий
+	    $query = $this->getWhereExcludeCategorys( $query );
+		
+	    
+	
+	    if ($category_id = JFactory::getApplication()->input->getInt('category_id')) {
 			$query->where("cat.category_id = " . $category_id);
 		}
         $query->group("prod.product_id");
         $query->order('revalent asc, ' . $order);
-		// echo $query;
-		// die;
-        
+	
+	
+//	    $start = microtime(true);
+	
+//	    echo 'Query Dump :'.__FILE__ .' Line:'.__LINE__  .$query->dump() ;
+//	    die(__FILE__ .' '. __LINE__ );
+	    
         $db->setQuery( $query, 0, $limit );
         $rows = $db->loadObjectList();
-		
+	
+//	    $time = microtime(true) - $start;
+//	    echo'<pre>';print_r( $time );echo'</pre>'.__FILE__.' '.__LINE__;
+//	    die(__FILE__ .' '. __LINE__ );
+     
 		$manufacturers_id = JFactory::getApplication()->input->get('manufacturer_id', array(), 'array');
         
 		$categorys = $manufacturers = array();
@@ -241,7 +265,11 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 		
 		JFactory::getApplication()->set('joomshopping_categorys_search', $categorys);
 		JFactory::getApplication()->set('joomshopping_manufacturers_search', $manufacturers);
+	 
 		
+	    
+	     
+	    
         return $rows;
     }
 
@@ -356,4 +384,38 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
         }
         return $rows;
     }
+	
+	/**
+	 * Исключение категорий
+	 * @param $query
+	 *
+	 * @return int|string
+	 *
+	 * @since version
+	 */
+	public function getWhereExcludeCategorys ( $query )
+	{
+		$exclude_categorys = $this->params->get( 'exclude_categorys', '' );
+		if( $exclude_categorys !== '' )
+		{
+			$exclude_categorys = explode( ',', $exclude_categorys );
+			foreach ($exclude_categorys as $key => $id)
+			{
+				$id = (int)trim( $id );
+				if( $id > 0 )
+				{
+					$exclude_categorys[ $key ] = $id;
+				} else
+				{
+					unset( $exclude_categorys[ $key ] );
+				}
+			}
+		}
+		
+		if( $exclude_categorys )
+		{
+			$query->where( "cat.category_id NOT IN (" . implode( ',', $exclude_categorys ) . ')' );
+		}
+		return $query ;
+	}
 }

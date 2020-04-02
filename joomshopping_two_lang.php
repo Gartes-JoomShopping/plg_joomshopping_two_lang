@@ -64,7 +64,7 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
         $select_desc = $this->params->def( 'select_desc', 0 );
 
 		$text = \Joomla\String\StringHelper::strtolower($text);
-	    $text = preg_replace('/[^\da-zа-яё,]/u', ' ', $text);
+	    $text = preg_replace('/[^\da-zа-яё,\.~`]/u', ' ', $text);
 		$text = preg_replace('/(\d+)/u', ' ${1} ', $text);
 		$text = preg_replace('/\s+/u', ' ', \Joomla\String\StringHelper::trim($text));
         if ($text == '') {

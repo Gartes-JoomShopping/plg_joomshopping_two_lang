@@ -17,8 +17,6 @@
         <filename>joomshopping_two_lang_update.xml</filename>
         <filename>README.md</filename>
     </files>
-
-
     <config>
         <fields name="params">
             <fieldset name="basic">
@@ -86,14 +84,14 @@
             </fieldset>
         </fields>
     </config>
-
 	<updateservers>
 		<server type="extension" name="JoomShopping - Search plugin joomshopping two languages update">https://raw.githubusercontent.com/Gartes-JoomShopping/plg_joomshopping_two_lang/master/joomshopping_two_lang_update.xml</server>
 	</updateservers>
-
-
 </extension>
+
 <!--
-INTAL :
+INSTALL :
+https://github.com/gartes/GNZ11/archive/master.zip
+https://github.com/Gartes-JoomShopping/mod_rokajaxsearch/archive/master.zip
 https://github.com/Gartes-JoomShopping/plg_joomshopping_two_lang/archive/master.zip
 -->

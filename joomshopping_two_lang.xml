@@ -93,5 +93,8 @@
 INSTALL :
 https://github.com/gartes/GNZ11/archive/master.zip
 https://github.com/Gartes-JoomShopping/mod_rokajaxsearch/archive/master.zip
+включить плагин и перенести все настройки с плагина Поиск - JoomShopping
+после чего отключить этот плагин (старый)
 https://github.com/Gartes-JoomShopping/plg_joomshopping_two_lang/archive/master.zip
+Копия этого текста в файле /plugins/search/joomshopping_two_lang/joomshopping_two_lang.xml
 -->

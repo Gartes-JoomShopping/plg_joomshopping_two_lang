@@ -7,7 +7,7 @@
     <license>Open Source License, GNU GPL</license>
     <authorEmail>sad.net79@gmail.com</authorEmail>
     <authorUrl>https://back-end.ga/</authorUrl>
-    <version>0.0.2</version>
+    <version>0.0.3</version>
     <description>Search plugin joomshopping two languages</description>
     <files>
         <folder>Helpers</folder>

@@ -152,8 +152,13 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 			image AS myimg,
 			product_price AS myprice,
 			currency_id AS mycurrency,
+			cat.category_id AS section_id ,
 			cat." . $db->quoteName($lang->get('name'))." AS section");
-
+			
+     /*   echo 'Query Dump :'.__FILE__ .' Line:'.__LINE__  .$query->dump() ;
+        
+        die(__FILE__ .' '. __LINE__ );*/
+        
 		switch($select_desc) {
 			case 0:
 				$query->select("CONCAT(prod.".$db->quoteName($lang->get('short_description')).",' ',prod.".$db->quoteName($lang->get('description')).") as text");
@@ -265,8 +270,26 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 		
 		JFactory::getApplication()->set('joomshopping_categorys_search', $categorys);
 		JFactory::getApplication()->set('joomshopping_manufacturers_search', $manufacturers);
-	 
+	   
 		
+				try
+						{
+							// Code that may throw an Exception or Error.
+							// $this->oooooooooooooooo();
+						}
+						catch (Exception $e)
+						{
+						   // Executed only in PHP 5, will not be reached in PHP 7
+						   echo 'Выброшено исключение: ',  $e->getMessage(), "\n";
+						}
+						catch (Throwable $e)
+						{
+							// Executed only in PHP 7, will not match in PHP 5
+							echo 'Выброшено исключение: ',  $e->getMessage(), "\n";
+							echo'<pre>';print_r( $e );echo'</pre>'.__FILE__.' '.__LINE__;
+						}
+		//echo'<pre>';print_r( count( $rows ) );echo'</pre>'.__FILE__.' '.__LINE__;
+		// die(__FILE__ .' '. __LINE__ );
 	    
 	     
 	    

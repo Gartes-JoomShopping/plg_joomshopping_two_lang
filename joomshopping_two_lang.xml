@@ -7,7 +7,7 @@
     <license>Open Source License, GNU GPL</license>
     <authorEmail>sad.net79@gmail.com</authorEmail>
     <authorUrl>https://back-end.ga/</authorUrl>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
     <description>Search plugin joomshopping two languages</description>
     <files>
         <folder>Helpers</folder>
@@ -89,12 +89,14 @@
 	</updateservers>
 </extension>
 
-<!--
-INSTALL :
-https://github.com/gartes/GNZ11/archive/master.zip
-https://github.com/Gartes-JoomShopping/mod_rokajaxsearch/archive/master.zip
-включить плагин и перенести все настройки с плагина Поиск - JoomShopping
-после чего отключить этот плагин (старый)
-https://github.com/Gartes-JoomShopping/plg_joomshopping_two_lang/archive/master.zip
-Копия этого текста в файле /plugins/search/joomshopping_two_lang/joomshopping_two_lang.xml
--->
+        <!--
+        INSTALL :
+        UPD : Обновить Обязательно библиотеку !!!
+        https://github.com/gartes/GNZ11/archive/master.zip
+
+        https://github.com/Gartes-JoomShopping/mod_rokajaxsearch/archive/master.zip
+        включить плагин и перенести все настройки с плагина Поиск - JoomShopping Поиск
+        после чего отключить этот плагин (старый)
+        https://github.com/Gartes-JoomShopping/plg_joomshopping_two_lang/archive/master.zip
+        Копия этого текста в файле /plugins/search/joomshopping_two_lang/joomshopping_two_lang.xml
+        -->

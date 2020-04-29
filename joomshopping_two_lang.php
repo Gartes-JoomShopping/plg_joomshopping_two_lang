@@ -442,3 +442,6 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 		return $query ;
 	}
 }
+
+
+

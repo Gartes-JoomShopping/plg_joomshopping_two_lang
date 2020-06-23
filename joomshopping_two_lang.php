@@ -23,7 +23,7 @@ defined( '_JEXEC' ) or die( 'Restricted access' );
 jimport('joomla.plugin.plugin');
 
 /*JPlugin::loadLanguage( 'plg_search_joomshopping' );*/
-	die(__FILE__ .' '. __LINE__ );
+
 class plgSearchJoomshopping_two_lang extends JPlugin {
 	
 	

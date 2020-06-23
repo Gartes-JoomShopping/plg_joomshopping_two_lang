@@ -16,14 +16,14 @@
 5. Затем товары, в которых есть любое из буквенных слов, по порядку, т.е. сначала те в которых есть Astrophysic, потом те, в которых есть XIS
 
 */
-
+	error_reporting(E_ALL & ~E_NOTICE);
 defined( '_JEXEC' ) or die( 'Restricted access' );
-error_reporting(E_ALL & ~E_NOTICE);
+
 
 jimport('joomla.plugin.plugin');
 
 /*JPlugin::loadLanguage( 'plg_search_joomshopping' );*/
-
+	die(__FILE__ .' '. __LINE__ );
 class plgSearchJoomshopping_two_lang extends JPlugin {
 	
 	
@@ -43,9 +43,9 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
 
     function onContentSearch( $text, $phrase='', $ordering='', $areas=null )
     {
-	    
-    	
-        require_once (JPATH_SITE.'/components/com_jshopping/lib/factory.php'); 
+
+
+		require_once (JPATH_SITE.'/components/com_jshopping/lib/factory.php');
         require_once (JPATH_SITE.'/components/com_jshopping/lib/functions.php');      
         
         $db =  JFactory::getDBO();

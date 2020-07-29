@@ -45,6 +45,9 @@ class plgSearchJoomshopping_two_lang extends JPlugin {
     {
 
 
+//        die(__FILE__ .' '. __LINE__ );
+
+
 		require_once (JPATH_SITE.'/components/com_jshopping/lib/factory.php');
         require_once (JPATH_SITE.'/components/com_jshopping/lib/functions.php');      
         

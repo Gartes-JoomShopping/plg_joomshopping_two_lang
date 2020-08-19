@@ -22,9 +22,7 @@ use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Profiler\Profiler;
 use Joomla\CMS\User\User;
 
-error_reporting(E_ALL);
-ini_set('display_startup_errors', 1);
-ini_set('display_errors', '1');
+
 
 
 defined( '_JEXEC' ) or die( 'Restricted access' );
@@ -162,13 +160,16 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      */
     function onContentSearch( $text, $phrase = '', $ordering = '', $areas = null )
     {
+        if ( !defined('TWO_LANG_DEBUG') ) define( 'TWO_LANG_DEBUG' , $this->params->get( 'debug_on' , 0 ) );
+        if( TWO_LANG_DEBUG )
+        {
+            error_reporting(E_ALL);
+            ini_set('display_startup_errors', 1);
+            ini_set('display_errors', '1');
+        }#END IF
+
         if ($text == '') return array();
         $this->ordering = $ordering ;
-
-
-
-
-        
 
 
         # Проверка что ищим в допустимом компоненте
@@ -185,7 +186,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         JLoader::registerNamespace( 'GNZ11' , JPATH_LIBRARIES . '/GNZ11' , $reset = false , $prepend = false , $type = 'psr4' );
         JLoader::registerNamespace('JoomshoppingTwoLang\Helpers',JPATH_PLUGINS.'/search/joomshopping_two_lang/Helpers',$reset=false,$prepend=false,$type='psr4');
 
-        if ( !defined('TWO_LANG_DEBUG') ) define( 'TWO_LANG_DEBUG' , $this->params->get( 'debug_on' , 0 ) );
+
         if( TWO_LANG_DEBUG ) {
             $this->profiler = Profiler::getInstance('plg_search_joomshopping_two_lang'); #END IF
 

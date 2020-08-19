@@ -2,7 +2,9 @@
 	
 	namespace JoomshoppingTwoLang\Helpers;
 	
-	/**
+	use Joomla\CMS\Factory;
+
+    /**
 	 * @package     ${NAMESPACE}
 	 * @subpackage
 	 *
@@ -15,6 +17,17 @@
 		private $app;
 		public static $instance;
 		private static $libPath ;
+        private $arrRU = array(
+            "й","ц","у","к","е","н","г","ш","щ","з","х","ъ",
+            "ф","ы","в","а","п","р","о","л","д","ж","э",
+            "я","ч","с","м","и","т","ь","б","ю"
+        );
+        private $arrEN = array(
+            "q","w","e","r","t","y","u","i","o","p","[","]",
+            "a","s","d","f","g","h","j","k","l",";","'",
+            "z","x","c","v","b","n","m",",","."
+        );
+
 		/**
 		 * helper constructor.
 		 *
@@ -27,18 +40,14 @@
 			require_once ( self::$libPath.'/php-lang-correct/ReflectionTypeHint.php');
 			require_once ( self::$libPath.'/php-lang-correct/Text/LangCorrect.php');
 			require_once ( self::$libPath.'/php-lang-correct/UTF8.php');
-			
-			
-			
-			$this->app = \JFactory::getApplication();
-			
+			$this->app = Factory::getApplication();
 			return $this;
 		}#END FN
 		
 		/**
 		 * @param array $options
 		 *
-		 * @return helper
+		 * @return HelperString
 		 * @throws \Exception
 		 * @since 3.9
 		 */
@@ -54,22 +63,8 @@
 		public function getCorrect( $string ){
 			$corrector = new \Text_LangCorrect();
 			return $corrector->parse($string) ;
-//			return $corrector->parse('смtyf ytправиkmyjq hfcrладки цццюдшауучфьзду.ru') ;
-//			echo iconv('utf-8', 'windows-1251', $corrector->parse('смtyf ytправиkmyjq hfcrладки цццюдшауучфьзду.ru'));
-		
 		}
-		
-		private $arrRU = array(
-			"й","ц","у","к","е","н","г","ш","щ","з","х","ъ",
-			"ф","ы","в","а","п","р","о","л","д","ж","э",
-			"я","ч","с","м","и","т","ь","б","ю"
-		);
-		private $arrEN = array(
-			"q","w","e","r","t","y","u","i","o","p","[","]",
-			"a","s","d","f","g","h","j","k","l",";","'",
-			"z","x","c","v","b","n","m",",","."
-		);
-		
+
 		/**
 		 * Переключить в английскую раскладку
 		 * @param $string

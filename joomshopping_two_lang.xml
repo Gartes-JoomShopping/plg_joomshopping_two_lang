@@ -7,12 +7,15 @@
     <license>Open Source License, GNU GPL</license>
     <authorEmail>sad.net79@gmail.com</authorEmail>
     <authorUrl>https://back-end.ga/</authorUrl>
-    <version>0.0.6</version>
+    <version>0.0.7</version>
     <description>Search plugin joomshopping two languages</description>
     <files>
+        <folder>assets</folder>
         <folder>Helpers</folder>
         <folder>language</folder>
         <folder>Libraries</folder>
+        <folder>sql</folder>
+        <folder>tmpl</folder>
         <filename plugin="joomshopping_two_lang">joomshopping_two_lang.php</filename>
         <filename>joomshopping_two_lang_update.xml</filename>
         <filename>README.md</filename>
@@ -20,27 +23,10 @@
     <config>
         <fields name="params">
             <fieldset name="basic">
-                <field name="debug_on"
-                	type="radio"
-                	default="0"
-                	label="JOOMSHOPPING_TWO_LANG_DEBUG_ON"
-                	description="JOOMSHOPPING_TWO_LANG_DEBUG_ON_DESC"
-                	class="btn-group btn-group-yesno"
-                	showon=""
-                	>
-                	<option value="1">JYES</option>
-                	<option value="0">JNO</option>
-                </field>
 
 
 
 
-                <field name="search_limit" type="text"
-                       default="50"
-                       description="JFIELD_PLG_SEARCH_SEARCHLIMIT_DESC"
-                       label="JFIELD_PLG_SEARCH_SEARCHLIMIT_LABEL"
-                       size="5"
-                />
                 <field name="exclude_categorys" type="text"
                        default=""
                        description="ID категорий, разделенные запятыми"
@@ -97,6 +83,101 @@
                     <option value="0">JNO</option>
                 </field>
             </fieldset>
+            <fieldset name="result">
+<!--            Количество элементов в результатах при вводе поискового слова    -->
+                <field name="search_limit"
+                       type="text"
+                       default="5"
+                       description="JOOMSHOPPING_TWO_LANG_SEARCH_LIMIT_AJAX_DESC"
+                       label="JFIELD_PLG_SEARCH_SEARCHLIMIT_LABEL"
+                       size="5"
+                       filter="INT"
+                />
+                <field name="search_limit_in_page_search"
+                	type="text"
+                	default="40"
+                	class="search_limit_in_page_search "
+                    size="5"
+                	readonly=""
+                	required=""
+                	label="JOOMSHOPPING_TWO_LANG_SEARCH_LIMIT_IN_PAGE_SEARCH"
+                	description="JOOMSHOPPING_TWO_LANG_SEARCH_LIMIT_IN_PAGE_SEARCH_DESC"
+                	showon=""
+                	hint=""
+                	filter="INT" />
+            </fieldset>
+
+            <!--             Отладка   -->
+            <fieldset name="debug">
+                <field name="debug_on"
+                       type="radio"
+                       default="0"
+                       label="COM_PLUGINS_DEBUG_FIELDSET_DEBUG_ON"
+                       description="COM_PLUGINS_DEBUG_FIELDSET_DEBUG_ON_DESC"
+                       class="btn-group btn-group-yesno"
+                       showon=""
+                >
+                    <option value="1">JYES</option>
+                    <option value="0">JNO</option>
+                </field>
+<!--   отображать Систмные команды      -->
+                <field name="show_system_commands"
+                	type="radio"
+                	default="0"
+                	label="JOOMSHOPPING_TWO_LANG_SHOW_SYSTEM_COMMANDS"
+                	description="JOOMSHOPPING_TWO_LANG_SHOW_SYSTEM_COMMANDS_DESC"
+                	class="btn-group btn-group-yesno"
+                	showon=""
+                	>
+                	<option value="1">JYES</option>
+                	<option value="0">JNO</option>
+                </field>
+<!--                Систмные команды -->
+                <field name="system_commands"
+                	type="hidden"
+                	default="*create dictionary,*clear dictionary"
+                    class="system_commands "
+                	filter="raw" />
+
+
+
+
+                <field name="error_reporting_on"
+                	type="radio"
+                	default="0"
+                	label="COM_PLUGINS_DEBUG_FIELDSET_ERROR_REPORTING_ON"
+                	description="COM_PLUGINS_DEBUG_FIELDSET_ERROR_REPORTING_ON_DESC"
+                	class="btn-group btn-group-yesno"
+                	showon="debug_on:1"
+                	>
+                	<option value="1">JYES</option>
+                	<option value="0">JNO</option>
+                </field>
+                <field name="profile_on"
+                	type="radio"
+                	default="0"
+                	label="COM_PLUGINS_DEBUG_FIELDSET_PROFILE_ON"
+                	description="COM_PLUGINS_DEBUG_FIELDSET_PROFILE_ON_DESC"
+                	class="btn-group btn-group-yesno"
+                       showon="debug_on:1"
+                	>
+                	<option value="1">JYES</option>
+                	<option value="0">JNO</option>
+                </field>
+                <field name="query_db_debug"
+                	type="radio"
+                	default="0"
+                	label="COM_PLUGINS_DEBUG_FIELDSET_QUERY_DB_DEBUG"
+                	description="COM_PLUGINS_DEBUG_FIELDSET_QUERY_DB_DEBUG_DESC"
+                	class="btn-group btn-group-yesno"
+                       showon="debug_on:1"
+                	>
+                	<option value="1">JYES</option>
+                	<option value="0">JNO</option>
+                </field>
+            </fieldset>
+
+
         </fields>
     </config>
 	<updateservers>

@@ -16,13 +16,19 @@
 5. Затем товары, в которых есть любое из буквенных слов, по порядку, т.е. сначала те в которых есть Astrophysic, потом те, в которых есть XIS
 
 */
+
+
+
+# !!! Включактся в настройках плагина
 //	error_reporting(E_ALL & ~E_NOTICE);
 
+
+use Joomla\CMS\Factory;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Profiler\Profiler;
+use Joomla\CMS\Router\Route;
 use Joomla\CMS\User\User;
-
-
+use Joomla\String\StringHelper;
 
 
 defined( '_JEXEC' ) or die( 'Restricted access' );
@@ -30,12 +36,21 @@ defined( '_JEXEC' ) or die( 'Restricted access' );
 
 jimport('joomla.plugin.plugin');
 
+
 /*JPlugin::loadLanguage( 'plg_search_joomshopping' );*/
 
 class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
-    private $db ;
-	
+    /**
+     * @var JDatabaseDriver|null
+     * @since 3.9
+     */
+    public $db ;
+    /**
+     * @var string формат запроса json | html
+     * @since 3.9
+     */
+    public $format;
 	/**
 	 * @var \JoomshoppingTwoLang\Helpers\helper
 	 * @since version
@@ -45,7 +60,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      * @var bool - Settings => лимит строк при поиске
      * @since version
      */
-    private $limit;
+    public $limit;
     /**
      * @var bool - Settings => Поиск в полном описании
      * @since version
@@ -81,7 +96,6 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      * @since version
      */
     public $params;
-    protected $profiler;
     /**
      * @var mixed|multiLangField
      * @since version
@@ -91,7 +105,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      * @var JDatabaseQuery|string
      * @since version
      */
-    private $query;
+    public $query;
     /**
      * @var User
      * @since version
@@ -101,7 +115,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      * @var array|null - Результаты найденных товаров
      * @since 3.9
      */
-    private $resArrRows;
+    public $resArrRows;
     /**
      * @var \Joomla\CMS\Application\CMSApplication
      * @since 3.9
@@ -115,6 +129,53 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
     private $reduction = false ;
 
     /**
+     * @var bool|Profiler
+     * @since 3.9
+     */
+    protected $profiler = false;
+    /**
+     * @var array Результаты профилирования
+     * @since 3.9
+     */
+    private $profilerBuffer = [] ;
+
+    /**
+     * @var string Дамп Sql запроса для аомата json
+     * @since 3.9
+     */
+    private $QueryDump;
+    /**
+     * @var array  Хранение найденых товаров
+     * @since 3.9
+     */
+    public $product;
+    /**
+     * @var array список категорий
+     * @since 3.9
+     */
+    public $categorys;
+    /**
+     * @var array список производителей
+     * @since 3.9
+     */
+    public $manufacturers = [];
+    /**
+     * @var string Ссылка на все результаты поиска
+     * @since 3.9
+     */
+    protected $allResultLink;
+    /**
+     * @var int|null ID категории для поиска
+     * @since 3.9
+     */
+    public $category_id;
+    /**
+     * @var array Производители из GET
+     * @since 3.9
+     */
+    public $manufacturer_ids;
+
+    /**
      * plgSearchJoomshopping_two_lang constructor.
      * @param $subject
      * @param array $config
@@ -122,13 +183,103 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      */
     public function __construct(&$subject, $config = array())
     {
-        $this->db =  \Joomla\CMS\Factory::getDBO();
-        $this->app = \Joomla\CMS\Factory::getApplication();
-        $this->lang = JSFactory::getLang();
-        $this->user =  \Joomla\CMS\Factory::getUser();
+
+
+        
+
+
+        $this->_name = $config['name'];
+        $this->_type = $config['type'];
+
+        require_once (JPATH_SITE.'/components/com_jshopping/lib/factory.php');
+        require_once (JPATH_SITE.'/components/com_jshopping/lib/functions.php');
+
+        JLoader::registerNamespace( 'GNZ11' , JPATH_LIBRARIES . '/GNZ11' , $reset = false , $prepend = false , $type = 'psr4' );
+        JLoader::registerNamespace('JoomshoppingTwoLang\Helpers',JPATH_PLUGINS.'/search/joomshopping_two_lang/Helpers',$reset=false,$prepend=false,$type='psr4');
+
+        $this->db   =   Factory::getDBO();
+        $this->app  =   Factory::getApplication();
+        $this->user =   Factory::getUser();
+        $this->lang =   JSFactory::getLang();
+        $this->HelperString = \JoomshoppingTwoLang\Helpers\HelperString::instance();
+
         parent::__construct($subject, $config ) ;
+
+        if ( !defined('TWO_LANG_DEBUG') ) define( 'TWO_LANG_DEBUG' , $this->params->get( 'debug_on' , 0 ) );
+
+        # Инициализация отображение яровня ошибок во время работы скрипта
+        if( TWO_LANG_DEBUG ) {
+            # Инициализация отображение яровня ошибок во время работы скрипта
+            $this->_init_error_reporting(); #END IF
+
+            if( $this->params->get( 'profile_on' , 0 ) ){
+                $this->profiler = Profiler::getInstance('plg_search_joomshopping_two_lang');
+                $this->profiler->mark('plg_search_joomshopping_two_lang - __construct ');
+            }  #END IF
+        }
+
+        $self = $this ;
+
+    }
+    public static $self ;
+    /**
+     * @var INT Уровень отображения ошибок до инициализации _init_error_reporting()
+     * @since 3.9
+     */
+    private $errorlevel ;
+
+    /**
+     * Инициализация отображение яровня ошибок во время работы скрипта
+     * @since 3.9
+     * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
+     * @date 29.08.2020 07:27
+     *
+     */
+    private function _init_error_reporting(){
+        # запоминаем уровень отображение ошибок
+        $this->errorlevel = error_reporting();
+        if( !$this->params->get( 'error_reporting_on' , 0 ) ) return ;   #END IF
+        error_reporting(E_ALL);
+        ini_set('display_startup_errors', 1);
+        ini_set('display_errors', '1');
     }
 
+    /**
+     * Востантвление предедущего уровня ошибок
+     * @since 3.9
+     * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
+     * @date 29.08.2020 07:29
+     *
+     */
+    private function _restoreErrorLevel(){
+        if( !$this->params->get( 'error_reporting_on' , 0 ) ) return ;   #END IF
+        error_reporting( $this->errorlevel );
+    }
+
+    /**
+     * Создать ссылку
+     * @param array $params массив с параметрами запроса e.c.( 'option'=>'com_search' ,  'view'=>'search'  )
+     * @param bool  $isSef  true если нужна SEF ссылка
+     * @return string
+     * @since 3.9
+     * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
+     * @date 29.08.2020 17:19
+     *
+     */
+    protected function createLink(array $params, bool $isSef = false ): string
+    {
+        return \GNZ11\Joomla\Uri\Uri::createLink( $params,  $isSef );
+
+    }
+
+    /**
+     * Проверка что ищим в допустимом компоненте
+     * @return string[]
+     * @since 3.9
+     * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
+     * @date 29.08.2020 06:58
+     *
+     */
     function onContentSearchAreas(){
         static $areas = array(
             'joomshopping' => 'Товары'
@@ -141,11 +292,32 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      *
      * @since version
      */
-    protected function getSetting(){
-        $this->limit = $this->params->def( 'search_limit', 50 );
+    protected function setSetting(){
+
+        $this->format = $this->app->input->get('format' , false , 'STRING') ;
+        $this->category_ids = $this->app->input->get('category_ids' , false , 'ARRAY') ;
+        $this->manufacturer_ids = $this->app->input->get('manufacturer_id' , [] , 'ARRAY') ;
+
+        # Если это поиск Ajax при вводе поискового запроса
+        if( $this->format )
+        {
+            # Количество товаров в списке предлагаемых товаров для Ajax поиска
+            $this->limit = $this->params->def( 'search_limit', 5 );
+        }#END IF
+
         $this->search_description = $this->params->def( 'search_description', 1 );
         $this->search_description_short = $this->params->def( 'search_description_short', 1 );
+
+        # создать имена столбцов
+        $this->prod_name = 'prod.'.$this->db->quoteName($this->lang->get('name'));
+        $this->short_description = 'prod.'.$this->db->quoteName($this->lang->get('short_description'));
+        $this->description = 'prod.'.$this->db->quoteName($this->lang->get('description'));
+        $this->prod_keywords = 'prod.'.$this->db->quoteName($this->lang->get('meta_keyword'));
+
+
     }
+
+    public $ignoreParams = [] ;
 
     /**
      * @param $text
@@ -158,15 +330,19 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      * @throws Exception
      * @since version
      */
-    function onContentSearch( $text, $phrase = '', $ordering = '', $areas = null )
+    function onContentSearch( $text,   $ordering = '', $areas = null , $ignoreParams = [] )
     {
-        if ( !defined('TWO_LANG_DEBUG') ) define( 'TWO_LANG_DEBUG' , $this->params->get( 'debug_on' , 0 ) );
-        if( TWO_LANG_DEBUG )
+
+
+        
+        
+        $text = $this->app->input->get('searchword' , '' , 'RAW') ;
+        if ($ignoreParams)
         {
-            error_reporting(E_ALL);
-            ini_set('display_startup_errors', 1);
-            ini_set('display_errors', '1');
+            $this->ignoreParams = $ignoreParams ;
         }#END IF
+
+
 
         if ($text == '') return array();
         $this->ordering = $ordering ;
@@ -174,248 +350,362 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
         # Проверка что ищим в допустимом компоненте
         if (is_array($areas)) {
+            # array_intersect — Вычисляет схождение массивов
             if (  !array_intersect($areas, array_keys( $this->onContentSearchAreas() )  )  ) {
                 return array();
             }
         }
 
 
-        # Установить настройки плагина в глобвльные переменные классв
-        $this->getSetting() ;
+        if( $this->profiler  ) $this->profiler->mark('Before setSetting Line ' . __LINE__ ); #END IF
 
-        JLoader::registerNamespace( 'GNZ11' , JPATH_LIBRARIES . '/GNZ11' , $reset = false , $prepend = false , $type = 'psr4' );
-        JLoader::registerNamespace('JoomshoppingTwoLang\Helpers',JPATH_PLUGINS.'/search/joomshopping_two_lang/Helpers',$reset=false,$prepend=false,$type='psr4');
-
-
-        if( TWO_LANG_DEBUG ) {
-            $this->profiler = Profiler::getInstance('plg_search_joomshopping_two_lang'); #END IF
-
-            $this->profiler->mark('onContentSearch - ');
-            $this->profiler->mark('onContentSearch - Start' . PHP_EOL. 'SETTINGS : ' . PHP_EOL  . implode( PHP_EOL  , [
-                'limit : '.$this->limit
-                ] ) );
-        }
+        # Установить настройки плагина в глобальные переменные класса
+        $this->setSetting() ;
 
 
-        $this->HelperString = \JoomshoppingTwoLang\Helpers\HelperString::instance();
 
-        require_once (JPATH_SITE.'/components/com_jshopping/lib/factory.php');
-        require_once (JPATH_SITE.'/components/com_jshopping/lib/functions.php');
-
-
-        # создать имена столбцов
-        $this->prod_name = 'prod.'.$this->db->quoteName($this->lang->get('name'));
-        $this->short_description = 'prod.'.$this->db->quoteName($this->lang->get('short_description'));
-        $this->description = 'prod.'.$this->db->quoteName($this->lang->get('description'));
-        $this->prod_keywords = 'prod.'.$this->db->quoteName($this->lang->get('meta_keyword'));
 
         # Получить тело основного запроса
         $this->_getQueryBody();
 
-
-
-
-
         # Замена двойных пробелов одинарными
         $text = preg_replace('/\s+/', ' ', $text);
         # Убираем пробелы по краям
-        $text = \Joomla\String\StringHelper::trim( $text );
+        $text = StringHelper::trim( $text );
         # Make a string lowercase
-        $text = \Joomla\String\StringHelper::strtolower( $text );
+        $text = StringHelper::strtolower( $text );
 
         # Переключить в Русскую раскладку
         $text_inRu = $this->HelperString->correctStringRU( $text ) ;
         # Переключить в английскую раскладку
         $text_inEn = $this->HelperString->correctStringEN( $text ) ;
 
+
         $StopSymbolsPattern  = '/[\[\]\{\}`]/';
         # Проверяем на запрещенные символы при переключении раскладки
         preg_match_all( $StopSymbolsPattern , $text_inEn , $out_inEn , PREG_OFFSET_CAPTURE ) ;
         $text_inEn = ( !count($out_inEn[0] )  ? $text_inEn : null ) ;
 
-        $whereArr = [] ;
+        # Переворот расскладки клавиатуры
+        $addTextString = $this->textRuEnValidation($text_inRu, $text, $text_inEn);#END IF
 
         # если $text - это число - будем в начале искать в артикулах товара
         if( self::checkIs_numeric($text) )
         {
-            # Установка уловий WHERE и поиск в КОДАХ товара
-            $resArrRows = $this->getWhereProductEan($text, $text_inRu, $text_inEn);
+            /**
+             * Установка уловий WHERE и поиск в КОДАХ товара
+             * @returns  $this->resArrRows
+             */
+            $this->resArrRows = $this->getWhereProductEan($text, $text_inRu, $text_inEn);
         }
         else
         {
-            # Условия WHERE для поиска в названиях товара
-            $resArrRows = $this->getWhereProductName(  $text , $text_inRu, $text_inEn);
+
+            /**
+             * Условия WHERE для поиска в названиях товара
+             * @returns  $this->resArrRows
+             */
+            $this->getWhereProductName(  $text , $addTextString );
         }
 
         $categorys = array();
         $manufacturers = array();
-        $manufacturers_id = JFactory::getApplication()->input->get('manufacturer_id', array(), 'array');
+
+        $manufacturers_id = $this->app->input->get('manufacturer_id', array(), 'array');
+
 
         #ARR categorys & manufacturers
+        /**
+         * Создать ссылки перейти в категорию &&
+         */
+
+
+        $this->app->set('joomshopping_product_search', $this->resArrRows );
+
+
+
+
+
+        $this->app->set('joomshopping_two_lang' , $this ) ;
         if( $this->resArrRows )
         {
-            foreach($this->resArrRows as $key => &$row) {
-                $row->href = SEFLink('index.php?option=com_jshopping&controller=product&task=view&category_id='.$row->catslug.'&product_id='.$row->slug, 1);
-//                $row->href = JRoute::_('index.php?option=com_jshopping&controller=product&task=view&category_id='.$row->catslug.'&product_id='.$row->slug, 1);
 
-                if( !in_array($row->section_id , $categorys )  )
+            /**
+             * 1. Получить элемент запроса в данном случае это SELECT
+             * @var array $select
+             */
+            $select = $this->query->select->getElements() ;
+            $where = $this->query->where->getElements() ;
+            # Очищием елемент запроса SELECT
+            $this->query->clear('select');
+
+            
+
+            
+
+
+            # Очищием елемент запроса ORDER BY
+
+            $this->query->clear('limit');
+
+            if ($this->format != 'json')
+            {
+                # Очищием елемент запроса ORDER BY
+                $this->query->clear('order');
+                $this->query->order('section');
+            }#END IF
+
+            $newSelect = [
+                $this->db->quoteName('cat.category_id' , 'section_id') ,
+                $this->db->quoteName('cat.name_ru-RU' , 'section') ,
+            ] ;
+
+            if (isset( $select[15] ))
+            {
+                $newSelect[] =  $select[15];
+            }#END IF
+            $this->query->select( $newSelect ) ;
+
+
+//            $this->category_ids = $this->app->input->get('category_id' , false , 'STRING') ;
+            # очищаем where от условия ID category для того что бы получить все категории
+            if ( is_array( $this->category_ids )  )
+            {
+                unset( $where[4] );
+                $this->query->clear('where');
+                $this->query->where( $where ) ;
+            }#END IF
+
+
+
+
+
+
+
+//            echo'<pre>';print_r( $this->query->dump() );echo'</pre>'.__FILE__.' '.__LINE__;
+//            die(__FILE__ .' '. __LINE__ );
+
+
+
+            $limit = $this->format == 'json' ? null : null ;
+            $this->db->setQuery($this->query  , 0, $limit );
+
+            $cats = $this->db->loadObjectList();
+
+
+
+
+
+            $categorySelected = $this->app->input->get( 'category_id', [] , 'ARRAY' ) ;
+            $this->categorys = [] ;
+            foreach ($cats as $category)
+            {
+                $i = $category->section_id ;
+                if ( !isset( $this->categorys[$i] ) )
                 {
-                    $categorys[$row->section_id] = (object) array(
-                        'id' => $row->section_id ,
-                        'name' => $row->section,
-                        'href' => SEFLink('index.php?option=com_jshopping&controller=category&task=view&category_id='.$row->section_id, 1)
-                    );
+                    $this->categorys[$i] = new stdClass() ;
                 }#END IF
+                $this->categorys[$i]->id =  $category->section_id ;
+                $this->categorys[$i]->name =  $category->section ;
+                $this->categorys[$i]->active =  in_array($category->section_id , $categorySelected) ;
 
-                $manufacturers[$row->manufacturer_id] = (object) array(
-                    'id' => $row->manufacturer_id,
-                    'name' => $row->manufacturer_name,
-                    'active' => in_array($row->manufacturer_id, $manufacturers_id)
-                );
 
+
+
+
+
+                # для запроса json - ( экономим время и просто возырвщаем ссылку )
+                $this->categorys[$i]->href =  'index.php?option=com_jshopping&controller=category&task=view&category_id='.$category->section_id  ;
+                # SEF ссылка - создадим после установка элемента в BODY
+                if ($this->format != 'json')
+                {
+                    $this->categorys[$i]->href = SEFLink('index.php?option=com_jshopping&controller=category&task=view&category_id=' . $category->section_id, 1);
+                }
+                $this->categorys[$i]->count ++ ;
+            }#END FOREACH
+
+
+            /*echo'<pre>';print_r( $this->categorys );echo'</pre>'.__FILE__.' '.__LINE__;
+            die(__FILE__ .' '. __LINE__ );*/
+            
+            if( $this->profiler )  $this->profiler->mark('onContentSearch (BEFORE FOREACH $this->resArrRows)');
+
+            $_GET_DATA = $this->app->input->getArray([
+                'searchword'=> 'RAW' ,
+                'category_id'=> 'INT' ,
+                'searchphrase'=> 'RAW' ,
+                'limit'=> 'INT' ,
+                'start'=> 'INT' ,
+                'ordering'=> 'STRING' ,
+                'view'=> 'STRING' ,
+                'option'=> 'STRING' ,
+                'Itemid'=> 'INT' ,
+                'limitstart'=> 'INT' ,
+
+            ]);
+             
+
+
+
+
+            foreach($this->resArrRows as $key => &$row) {
+
+
+                # Ссылка для товара
+                $link = 'index.php?option=com_jshopping&controller=product&task=view&category_id='.$row->catslug.'&product_id='.$row->slug ;
+                # для запроса json - ( экономим время и просто возырвщаем ссылку )
+                # SEF ссылка - создадим после установка элемента в BODY
+                if( $this->format == 'json' )
+                {
+                    $row->link = $link ;
+                }else{
+                    $row->href = $this->SEFLink($link , 1);
+                }#END IF
+            }
+            # ПОИСК:Создание данных о производителе
+            if( $this->format != 'json' ){
+                $this->manufacturers = $this->getManufacturers($this->resArrRows );
             }
         }#END IF
-        \Joomla\CMS\Factory::getApplication()->set('joomshopping_categorys_search', $categorys);
-        \Joomla\CMS\Factory::getApplication()->set('joomshopping_manufacturers_search', $manufacturers);
-
-        if( TWO_LANG_DEBUG )  $this->profiler->mark('onContentSearch (Before return )');
 
 
 
+        $this->app->set('joomshopping_manufacturers_search', $this->manufacturers );
+        $this->app->set('joomshopping_categorys_search', $this->categorys);
+
+        if( $this->profiler )  $this->profiler->mark('onContentSearch (Before return )');
         if( TWO_LANG_DEBUG ) {
             # DUMP BD joomshopping_two_lang
-            $loadObjectListTime = $this->profiler->getBuffer();
-            echo'<pre>';print_r( $loadObjectListTime );echo'</pre>'.__FILE__.' '.__LINE__;
+            if( $this->profiler ){
+                $this->profilerBuffer = $this->profiler->getBuffer();  #END IF
+            }
 
-
+            
+            if(   $this->format != 'json' )
+            {
+                echo $this->QueryDump;
+                if( $this->profiler )
+                {
+                    echo'<pre>';print_r( $this->profilerBuffer );echo'</pre>'.__FILE__.' '.__LINE__;
+                }#END IF
+                #Востантвление предедущего уровня ошибок
+                $this->_restoreErrorLevel();
+            }#END IF
 
         };
 
-        return $resArrRows ;
+        return $this->resArrRows ;
+    }
+
+    /**
+     *
+     * @param $row
+     * @return array
+     * @since 3.9
+     * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
+     * @date 09.09.2020 18:38
+     *
+     */
+    public function getManufacturers( $resArrRows     ): array
+    {
+        $manufacturers_id = $this->app->input->get('manufacturer_id', array(), 'array');
+        $_GET_DATA = $this->app->input->getArray([
+            'searchword'=> 'RAW' ,
+            'category_id'=> 'INT' ,
+            'searchphrase'=> 'RAW' ,
+            'limit'=> 'INT' ,
+            'start'=> 'INT' ,
+            'ordering'=> 'STRING' ,
+            'view'=> 'STRING' ,
+            'option'=> 'STRING' ,
+            'Itemid'=> 'INT' ,
+            'limitstart'=> 'INT' ,
+
+        ]);
 
 
-        ###########################################################################################################33333
-        ###########################################################################################################33333
-        ###########################################################################################################33333
-        $text = preg_replace('/[^\s\da-zа-яё\-,\.~`]/u', '', $text);
+        if ($this->profiler) $this->profiler->mark('onContentSearch ( Before Uri Create Manufacturer link)');
+
+        foreach($resArrRows as $key => &$row) {
+            # если в GET передвнны производители из фильтра -
+            $manufacturer_ids = $this->app->input->get('manufacturer_id', [], 'ARRAY');
+            if (!in_array($row->manufacturer_id, $manufacturer_ids))
+            {
+                array_push($manufacturer_ids, $row->manufacturer_id);
+            }#END IF
 
 
-		$text = preg_replace('/(\d+)/u', '${1}', $text);
-        $text = preg_replace('/\s+/u', ' ', \Joomla\String\StringHelper::trim($text));
+            $_GET_DATA['manufacturer_id'] = $manufacturer_ids;
+            $uri = \Joomla\CMS\Uri\Uri::getInstance();
+            # Созадем строку с параметрами
+            # e.g. : ordering=popular&limit=2&searchword=Профи МОНО&option=com_search&view=search
+            $Query = $uri::buildQuery($_GET_DATA);
+            # Устанавливаем параметры в Uri
+            $uri->setQuery($Query);
+            # не SEF Ссылка
+            # e.g. : index.php?ordering=popular&limit=2&searchword=Профи МОНО&option=com_search&view=search
+            $link = 'index.php' . $uri->toString(array('query', 'fragment'));
 
-		$full_text = $text;
-
-
-		$wordsWithoutNumbers = array();
-		$words = explode(' ', $text);
-		foreach ($words as $key=>$value) {
-			$words[$key] = $this->db->escape($value, true);
-			if (preg_replace('/\d/u', '', $value)) {
-				$wordsWithoutNumbers[] = $words[$key];
-			}
-		}
-
-
-		if (!$wordsWithoutNumbers) {
-			$wordsWithoutNumbers = $words;
-		}
-		if (!$wordsWithoutNumbers) {
-            return array();
-		}
-
-		$revalent_0 = $this->prod_keywords . ' rlike ' . $this->db->quote('[[:<:]]' . implode('[[:>:]][[:<:]]', $words) . '[[:>:]]', false);
-
-		$revalent_1 = array();
-        $revalent_3 = array();
-        $revalent_4 = array();
-
-		foreach ($words as $key=>$value) {
-			$revalent_1[] = $this->prod_keywords . ' like ' . $this->db->quote('%' . $value . '%', false);
-		}
-
-		$revalent_1 = implode(' and ', $revalent_1);
-		$revalent_2 = $this->prod_keywords . ' like ' . $this->db->quote('%' . implode('%', $wordsWithoutNumbers) . '%', false);
-        foreach ($wordsWithoutNumbers as $key=>$value) {
-			$revalent_3[] = $this->prod_keywords . ' like ' . $this->db->quote('%' . $value . '%', false);
-		}
-		$revalent_3 = implode(' and ', $revalent_3);
-        foreach ($wordsWithoutNumbers as $key=>$value) {
-			$revalent_4[] = $this->prod_keywords . ' like ' . $this->db->quote('%' . $value . '%', false);
-		}
-		$revalent_4 = implode(' or ', $revalent_4);
-		$revalent = 'if((' . $revalent_0 . '), 0, if((' . $revalent_1 . '), 1, if((' . $revalent_2 . '), 2, if((' . $revalent_3 . '), 3, if((' . $revalent_4 . '), 4, 5)))))';
-        $this->HelperString = \JoomshoppingTwoLang\Helpers\HelperString::instance();
-
-        $full_text = $this->HelperString->getCorrect( $full_text ) ;
-
-        $whereArr = [] ;
-        $whereArr[] = 'prod.`name_ru-RU` = ' . $this->db->quote( $full_text )  ;
-        $whereArr[] = 'prod.`name_ru-RU` LIKE ' . $this->db->quote( '%'.$full_text.'%' )  ;
-        $whereArr[] = 'product_ean = ' . $this->db->quote($full_text) ;
-        $whereArr[] = 'product_ean LIKE ' . $this->db->quote( '%'.$full_text.'%' ) ;
-
-        $where = '('. implode(' or ', $whereArr) . ')';
-        $query->where($where);
-
-        $this->db->setQuery( $this->query , 0, $this->limit );
-        $resArrRows = $this->db->loadObjectList( 'slug' );
-
-        echo'<pre>';print_r( $resArrRows );echo'</pre>'.__FILE__.' '.__LINE__;
-        die(__FILE__ .' '. __LINE__ );
+            # SEF Ссылка
+            # Если последним параметром передается TRUE - то ссылка абсолютная
+            $sefLink = \Joomla\CMS\Router\Route::_($link, false, 0, true);
 
 
-
-        $this->db->setQuery( $this->query, 0, $this->limit );
-        $rows = $this->db->loadObjectList('slug');
-
-		$categorys = array();
-        $manufacturers = array();
-        $manufacturers_id = JFactory::getApplication()->input->get('manufacturer_id', array(), 'array');
-        if ($rows){
-			$query = 'SELECT ' . $this->db->quoteName($this->lang->get('name')) . ' as name, manufacturer_id FROM ' . $this->db->quoteName('#__jshopping_manufacturers');
-			$this->db->setQuery($query);
-			$allManufacturers = $this->db->loadObjectList('manufacturer_id');
-            foreach($rows as $key => $row) {
-				if ($row->manufacturer_id && isset($allManufacturers[$row->manufacturer_id])) {
-					$manufacturers[$row->manufacturer_id] = (object) array(
-						'id' => $row->manufacturer_id,
-						'name' => $allManufacturers[$row->manufacturer_id]->name,
-						'active' => in_array($row->manufacturer_id, $manufacturers_id)
-					);
-				}
-				if ($manufacturers_id && !in_array($row->manufacturer_id, $manufacturers_id)) {
-					unset($rows[$key]);
-					continue;
-				}
-                $rows[$key]->href = SEFLink('index.php?option=com_jshopping&controller=product&task=view&category_id='.$row->catslug.'&product_id='.$row->slug, 1);
-				$categorys[$row->catslug] = $row->catslug;
-            }
-
-			$query = 'SELECT '
-                . $this->db->quoteName($this->lang->get('name')) . ' as name, '
-                .' category_id FROM ' . $this->db->quoteName('#__jshopping_categories');
-			$this->db->setQuery($query);
-			$allCategorys = $this->db->loadObjectList('category_id');
-			foreach ($categorys as $category_id) {
-				if (isset($allCategorys[$category_id])) {
-					$categorys[$category_id] = (object) array(
-						'id' => $category_id,
-						'name' => $allCategorys[$category_id]->name,
-						'href' => SEFLink('index.php?option=com_jshopping&controller=category&task=view&category_id='.$category_id, 1)
-					);
-				} else {
-					unset($categorys[$category_id]);
-				}
-			}
+            $manufacturers[$row->manufacturer_id] = (object)array(
+                'id' => $row->manufacturer_id,
+                'name' => $row->manufacturer_name,
+                'active' => in_array($row->manufacturer_id, $manufacturers_id),
+                'link' => $sefLink,
+            );
         }
 
-		\Joomla\CMS\Factory::getApplication()->set('joomshopping_categorys_search', $categorys);
-        \Joomla\CMS\Factory::getApplication()->set('joomshopping_manufacturers_search', $manufacturers);
+        if ($this->profiler) $this->profiler->mark('onContentSearch ( After Uri Create Manufacturer link)');
 
-        return $rows;
+        return $manufacturers ;
+
     }
 
 
+    /**
+     * SET Sef Link
+     *
+     * @param string $link
+     * @param int $useDefaultItemId - (0 - current itemid, 1 - shop page itemid, 2 -manufacturer itemid)
+     * @param int $redirect
+     * @since 3.9
+     */
+    function SEFLink( $link, $useDefaultItemId = 0, $redirect = 0, $ssl=null){
+        /*$this->app = JFactory::getApplication();
+        JPluginHelper::importPlugin('jshoppingproducts');
+        $dispatcher =JDispatcher::getInstance();
+        $dispatcher->trigger('onLoadJshopSefLink', array(&$link, &$useDefaultItemId, &$redirect, &$ssl));*/
+
+
+        $defaultItemid = getDefaultItemid();
+        if( $useDefaultItemId == 2 )
+        {
+            $Itemid = getShopManufacturerPageItemid();
+            if( !$Itemid )
+                $Itemid = $defaultItemid;
+        }
+        elseif( $useDefaultItemId == 1 )
+        {
+            $Itemid = $defaultItemid;
+        }
+        else
+        {
+            $Itemid = $this->app->input->getInt('Itemid');
+            if( !$Itemid )
+                $Itemid = $defaultItemid;
+        }
+        if (!preg_match('/Itemid=/', $link)){
+            if (!preg_match('/\?/', $link)) $sp = "?"; else $sp = "&";
+            $link .= $sp.'Itemid='.$Itemid;
+        }
+
+      $link = Route::_($link, (($redirect) ? (false) : (true)), $ssl = 1 );
+      return $link;
+    }
 
     /**
      * Создать регулярное авражение из строки запроса
@@ -443,48 +733,45 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      */
     private function _getQueryBody()
     {
-
-
         $this->query = $this->db->getQuery(true);
+
         $l_name = $this->lang->get('name') ;
         $l_keyword = $this->lang->get('meta_keyword') ;
+
         # Создание условия Select
+        $select =  [
+                $this->db->quoteName( 'prod.product_id' , 'slug' ) . PHP_EOL ,
+                $this->db->quoteName( 'product_ean'   ) . PHP_EOL ,
+                $this->db->quoteName( 'prod.' . $l_name , 'title' ) . PHP_EOL ,
+                $this->db->quoteName( 'prod.' . $l_keyword  , 'meta_keyword' ) . PHP_EOL ,
+                $this->db->quoteName( 'prod.product_date_added',  'created' ) . PHP_EOL ,
+                $this->db->quoteName( 'prod.product_manufacturer_id',  'manufacturer_id' ) . PHP_EOL ,
+                $this->db->quoteName( 'image',  'myimg' ) . PHP_EOL ,
+                $this->db->quoteName( 'product_price',  'myprice' ) . PHP_EOL ,
+                $this->db->quoteName( 'currency_id',  'mycurrency' ) . PHP_EOL ,
+
+                $this->db->quoteName( 'pr_cat.category_id' , 'catslug'   ) . PHP_EOL ,
+                 '2 AS browsernav' . PHP_EOL ,
+
+                $this->db->quoteName(  'cat.category_id'  , 'section_id'   ). PHP_EOL ,
+                $this->db->quoteName('cat.'.$l_name , 'section' ) . PHP_EOL ,
+
+                $this->db->quoteName( 'm.' . $l_name ,  'manufacturer_name' ). PHP_EOL ,
+        ] ;
 
 
-        $select = "prod.product_id AS slug, 
-            product_ean , 
-			pr_cat.category_id AS catslug, "
-            . $this->db->quoteName( 'prod.' . $l_name )." as title, "
-            . $this->db->quoteName( 'prod.' . $l_keyword )." as meta_keyword,
-			'2' AS browsernav ,
-			prod.product_date_added AS created,
-			prod.product_manufacturer_id AS manufacturer_id,"
-			. $this->db->quoteName( 'm.' . $l_name )." as manufacturer_name , "."
-			
-			image AS myimg,
-			product_price AS myprice,
-			currency_id AS mycurrency,
-			cat.category_id AS section_id  
-			" . PHP_EOL ;
-//cat." . $this->db->quoteName($l_name)." AS section
         $this->query->select($select);
-
-        $select = [
-            $this->db->quoteName('cat.'.$l_name , 'section' ) . PHP_EOL ,
-
-        ];
-        $this->query->select($select);
-
-
         $this->query->from("#__jshopping_products AS prod");
         $this->query->join('LEFT', $this->db->quoteName('#__jshopping_products_to_categories') . " AS pr_cat ON pr_cat.product_id = prod.product_id");
         $this->query->join('LEFT', $this->db->quoteName('#__jshopping_manufacturers') . " AS m ON m.manufacturer_id = prod.product_manufacturer_id");
         $this->query->join('LEFT', $this->db->quoteName('#__jshopping_categories') . " AS cat ON pr_cat.category_id = cat.category_id");
-        $this->query->where("prod.product_publish = '1'");
-        $this->query->where("cat.category_publish = '1'");
-        $this->query->group("prod.product_id");
-//        echo 'Query Dump :'.__FILE__ .' Line:'.__LINE__  .$this->query->dump() ;
-//        die(__FILE__ .' '. __LINE__ );
+        $this->query->where( "prod.product_publish = '1'" . PHP_EOL );
+        $this->query->where( "cat.category_publish = '1'" . PHP_EOL );
+//        $this->query->group( "prod.product_id");
+
+
+
+
         # Способ выборки описания :
         # 0 - Добавить краткое описание к полному
         # 1 - Только краткое описани
@@ -528,10 +815,17 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         # Исключение категорий
         $this->query = $this->getWhereExcludeCategorys( $this->query );
 
-        # Если установлено Искать в категории устанавливаем в условие
-        if ($category_id = \Joomla\CMS\Factory::getApplication()->input->getInt('category_id')) {
-            $this->query->where("cat.category_id = " . $category_id);
-        }
+
+
+
+
+
+
+
+
+
+
+
     }
 
 	/**
@@ -592,18 +886,18 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
         $textTestNum = self::checkIs_numeric( $text ) ;
 
+
+
+
         # Если - не искать текст в SQU
         if( !$this->params->get('no_find_text_in_squ' , true ) && !$textTestNum  ) return  ; #END IF
 
         $text = $textTestNum;
 
-
         # Артикулах товара - полное совподение
-//        $whereArr[] = 'LOWER (product_ean) = ' . $this->db->quote($text) . PHP_EOL;
+        $whereArr[] = 'prod.`product_id` LIKE ' . $this->db->quote($text.'%') . PHP_EOL;
 
-//        **********555
-//        $whereArr[] = 'prod.`product_ean` = ' . $text . PHP_EOL;
-        $whereArr[] = 'prod.`product_id` = ' . $text . PHP_EOL;
+
 
         # Артикулах товара - совподение подстроки
         if( !is_numeric($textTestNum) )
@@ -612,6 +906,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         }else {
 //            $whereArr[] = 'product_ean LIKE ' . $this->db->quote(/*'%' .*/ $text/*.'%'*/) . PHP_EOL;
         }#END IF
+
 
 
         if( $text != $text_inRu && !is_numeric($textTestNum) )
@@ -632,12 +927,6 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
             $whereArr[] = 'LOWER (product_ean) LIKE ' . $this->db->quote('%' . $text_inEn . '%') . PHP_EOL;
         }#END IF
 
-        /*if( $text !== $textLtrim && !is_numeric($textTestNum) )
-        {
-            $whereArr[] = 'LOWER (product_ean) LIKE ' . $this->db->quote('%' . $textLtrim . '%') . PHP_EOL;
-        }#END IF*/
-
-
         # Артикулах товара - поиск по регулярному выражению
 //        $whereArr[] = 'LOWER (product_ean) RLIKE "' . $this->getRLikeText($text) . '"' . PHP_EOL;
         if( $text != $text_inRu && !is_numeric($textTestNum) )
@@ -649,11 +938,12 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
             $whereArr[] = 'LOWER (product_ean) RLIKE "' . $this->getRLikeText($text_inEn) . '"' . PHP_EOL;
         }#END IF
 
-        /*$where = PHP_EOL . '('. implode(' or ', $whereArr) . ')';
-        $this->query->where( $where );
-        $this->db->setQuery( $this->query , 0, $this->limit );*/
 
         $this->resArrRows = $this->getResult($whereArr , 'ProductEan');
+
+
+
+
         return  $this->resArrRows ;
     }
 
@@ -668,86 +958,56 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      * @date 17.08.2020 17:58
      *
      */
-    private function getWhereProductName(  string $text , string $text_inRu, string $text_inEn)
+    private function getWhereProductName(  string $text , string $addTextString )
     {
         ###  Соотношение букв и цифр к пробелам
         $this->checkReduction($text);
 
-        /*if( !$this->reduction &&  )
-        {
-
-        }#END IF*/
-
-
-
-
-
-
-        $whereArr = [] ;
         $cloneText = $text ;
 
         $_q_name_ru = $this->db->quoteName('prod.name_ru-RU');
         $_q_keyword = $this->db->quoteName('prod.meta_keyword_ru-RU');
-        
-        
-        # Поиск в поле название товара
-        if( $text_inRu != $text )
+
+
+        # Получить количество слов в строке
+        $CountWord = \GNZ11\Document\Text::getCountWord( $cloneText );
+
+        if ( $CountWord == 1 )
         {
-            $addTextString = $text_inRu ;
-        }else{
-            $addTextString = $text_inEn ;
+            # Строим запрос для FULLTEXT
+            $this->buildQueryFullText($text, $addTextString );
+            if( $this->resArrRows ) return $this->resArrRows ; #END IF
         }#END IF
 
 
-        $_fArr = [' ' , '-'];
-        $text = str_replace( $_fArr , '>' , $text );
-        $addTextString = str_replace( $_fArr , '>' , $addTextString );
-
-        # Cодержание оператора AGAINST
-        $_againstText = $this->db->quote($text.' '.$addTextString.' '.$this->reduction );
-
-        # Cодержание оператора MATCH
-        $_matchText =   $_q_name_ru . ',' . $_q_keyword  ;
-
-        $this->query->select("MATCH (" . $_matchText  . ") AGAINST (".$_againstText." IN BOOLEAN MODE ) AS score " . PHP_EOL);
-
-        $whereArr[] = "MATCH (" . $_matchText. ") AGAINST (".$_againstText." IN BOOLEAN MODE ) " . PHP_EOL;
-
-        $this->query->order($this->db->quoteName('score') . ' DESC ');
 
 
-        $this->resArrRows = $this->getResult($whereArr , 'FULLTEXT' );
-        if( $this->resArrRows )
-        {
-            return $this->resArrRows ;
-        }#END IF
+
+
+
+
 
         /** #############################################################################################
          * Если ответ не получен ищем по подстроке
          */
         $text = $cloneText ;
-        # Получить тело основного запроса
-        $this->_getQueryBody();
-
-
-        if( $text_inRu != $text )
-        {
-            $addTextString = $text_inRu ;
-        }else{
-            $addTextString = $text_inEn ;
-        }#END IF
-
-
         $whereArr = [] ;
+        # Пересоздать тело основного запроса
+        $this->_getQueryBody();
         # Название товара - совподение подстроки
         $whereArr[] = 'LOWER (prod.`name_ru-RU`) LIKE ' . $this->db->quote('%' . $text . '%') . PHP_EOL;
         $whereArr[] = 'LOWER (prod.`name_ru-RU`) LIKE ' . $this->db->quote('%' . $addTextString . '%') . PHP_EOL;
-
 
         $this->resArrRows =  $this->getResult( $whereArr ,'LIKE' );
         if( $this->resArrRows )
         {
             return  $this->resArrRows  ;
+        }else{
+            # Пересоздать тело основного запроса
+            $this->_getQueryBody();
+            # Строим запрос для FULLTEXT
+            $this->buildQueryFullText($text, $addTextString );
+            if( $this->resArrRows ) return $this->resArrRows ;
         }#END IF
 
 
@@ -758,12 +1018,13 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         $this->_getQueryBody();
 
         $textRLike = $this->getRLikeText($text);
-        if( $text_inRu != $text )
+        $addTextString = $this->getRLikeText($addTextString) ;
+        /*if( $text_inRu != $text )
         {
             $addTextString = $this->getRLikeText($text_inRu) ;
         }else{
-            $addTextString = $this->getRLikeText($text_inEn) ;
-        }#END IF
+
+        }#END IF*/
         $whereArr[] = 'LOWER ( '.$_q_name_ru.' ) RLIKE "' . $textRLike . '"' . PHP_EOL;
         $whereArr[] = 'LOWER ( '.$_q_name_ru.' ) RLIKE "' . $addTextString . '"' . PHP_EOL;
         $whereArr[] = 'LOWER ( '.$_q_keyword.' ) RLIKE "' . $textRLike . '"' . PHP_EOL;
@@ -782,9 +1043,6 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
                     $this->product_auto_add_keyword() ;
                 }#END IF
             }#END IF
-
-
-
             return $this->resArrRows ;
         }#END IF
 
@@ -821,9 +1079,8 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         $object->description = 'A custom record being updated in the database.';
 
         // Update their details in the users table using id as the primary key.
-        $result = \Joomla\CMS\Factory::getDbo()->updateObject('#__custom_table', $object, 'id');
+        $result = Factory::getDbo()->updateObject('#__custom_table', $object, 'id');
     }
-
 
     /**
      * Расчет соотошение символов к пробелам и другим знакам
@@ -839,11 +1096,13 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         # Длина входящей строки
         $contentLen = strlen($content);
         # Строка кроме букв и чисел
-        $cleanString = preg_replace('/[a-zA-Zа-яА-Я\d]/', '', $content);
+        $cleanString = preg_replace('/[a-zA-Zа-яА-Я\d]/u', '', $content);
         # Длина кроме букв и чисел
         $cleanStringLen = strlen($cleanString);
         # Строка букв и чисел
-        $cleanLetters = preg_replace('/[^a-zA-Zа-яА-Я\d]/', '', $content);
+        $cleanLetters = preg_replace('/[^a-zA-Zа-яА-Я\d]/u', '', $content);
+
+        
         # Длина букв и чисел
         $cleanLettersLen = strlen($cleanLetters);
 
@@ -862,108 +1121,6 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         {
 //            $this->reduction = $arrSpace[0] ;
         }#END IF
-
-
-
-
-    }
-
-    /**
-     * Условия WHERE для поиска в Keywords товара
-     * @param string $text
-     * @param string $text_inRu
-     * @param string $text_inEn
-     * @param JDatabaseDriver $db
-     * @param object $query
-     * @param array $whereArr
-     *
-     *
-     * @since version
-     */
-    private function getWhereKeywords(string $text, string $text_inRu, string $text_inEn, JDatabaseDriver $db, object &$query, array &$whereArr)
-    {
-        #############################################################################################3
-        if( $text_inRu != $text )
-        {
-            $addTextString = $text_inRu ;
-        }else{
-            $addTextString = $text_inEn ;
-        }#END IF
-
-
-        # Ключевые слова
-        # Ключевые слова - полное совподение
-        /*$whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) = ' . $this->db->quote($text) . PHP_EOL ;
-        if( $text_inRu !== $text )
-        {
-            $whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) = ' . $this->db->quote($text_inRu) . PHP_EOL ;
-        }#END IF
-        if( $text_inEn && $text_inEn != $text )
-        {
-            $whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) = ' . $this->db->quote($text_inEn) . PHP_EOL ;
-        }#END IF*/
-
-
-        # Ключевые слова - соподение подстроки
-        /*$whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) LIKE ' . $this->db->quote( '%'.$text.'%' ) . PHP_EOL ;
-        if( $text_inRu !== $text )
-        {
-            $whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) LIKE ' . $this->db->quote( '%'.$text_inRu.'%' ) . PHP_EOL ;
-        }#END IF
-        if( $text_inEn && $text_inEn != $text )
-        {
-            $whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) LIKE ' . $this->db->quote( '%'.$text_inEn.'%' ) . PHP_EOL ;
-        }#END IF*/
-
-        //        $whereArr = [] ;
-
-        # Ключевые слова - поиск по регулярному выражению
-        /*$whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) RLIKE "' .  $this->getRLikeText($text) .'"' . PHP_EOL ;
-        if( $text_inRu !== $text )
-        {
-            $whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) RLIKE "' . $this->getRLikeText($text_inRu) . '"' . PHP_EOL;
-        }#END IF
-        if( $text_inEn && $text_inEn != $text )
-        {
-            $whereArr[] = 'LOWER ( prod.`meta_keyword_ru-RU`) RLIKE "' . $this->getRLikeText($text_inEn) . '"' . PHP_EOL;
-        }#END IF*/
-
-
-//        echo'<pre>';print_r( $text );echo'</pre>'.__FILE__.' '.__LINE__;
-//        $text = 'F T 2 5 R';
-//        $text = '251';
-        $_fArr = [' ' , '-'];
-        $text = str_replace( $_fArr , '>' , $text );
-        $addTextString = str_replace( $_fArr , '>' , $addTextString );
-
-//        $text = 'ft +25';
-//        $text = '+ft +25 +ft25 +ft25*';
-//        $text = 'ft25*';
-//        $text = 'FT-25R';
-        $_againstText = ''.$text.'' ;
-//        $_againstText .= '('.$text_inRu.')' ;
-//        $_againstText .= '('.$text_inEn.')' ;
-//        $_againstText = ( $text != $text_inRu  ? ' '.$text .' ' . $text_inRu . ' '  : ' '.$text .' '. $text_inEn );
-//        echo'<pre>';print_r( $_againstText );echo'</pre>'.__FILE__.' '.__LINE__;
-//        die(__FILE__ .' '. __LINE__ );
-
-//        $_againstText = '+каспер +идентификации';
-//        $_againstText = '+рация yaesu';
-//        $_againstText = '(+рация +yaesu)(+рация +нфуыг)(+hfwbz +yaesu)';
-
-
-
-        $_againstText = $this->db->quote($text .' '. $addTextString );
-//        $_addAgainstText = $this->db->quote($addTextString);
-
-        $_againstText = $this->db->quote($text .' '. $addTextString );
-        # Cодержание оператора MATCH
-        $_matchText =  $this->db->quoteName('prod.name_ru-RU') . ',' . $this->db->quoteName('prod.meta_keyword_ru-RU') ;
-
-
-        $this->query->select("MATCH (" . $_matchText  . ") AGAINST (".$_againstText." IN BOOLEAN MODE ) AS score " . PHP_EOL);
-        $whereArr[] = "MATCH (" . $_matchText. ") AGAINST (".$_againstText." IN BOOLEAN MODE ) " . PHP_EOL;
-        $this->query->order($this->db->quoteName('score') . ' DESC ');
     }
 
     /**
@@ -978,39 +1135,354 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      */
     protected function getResult(array $whereArr , string $context)
     {
+        $limit = $this->app->input->get('limit' , null , 'INT');
+
         $where = PHP_EOL . '(' . implode(' or ', $whereArr) . ')';
         $this->query->where($where);
-        $this->db->setQuery($this->query, 0, $this->limit);
+
+
+        $this->saveQuery = clone $this->query ;
+
+        # Если в GET Искать в категории
+        if( $this->format != 'json' && $this->category_ids  )
+        {
+            if ( is_array( $this->category_ids ) )
+            {
+                $this->query->where("cat.category_id IN ( " . implode( ',', (array)$this->category_ids ) . " )" );
+            }else{
+                $this->query->where("cat.category_id = ".$this->category_ids );
+            }#END IF
+
+        }#END IF
+
+        # если в GET передвнны производители из фильтра -
+        if (count( $this->manufacturer_ids ) && !in_array( 'manufacturer_id' , $this->ignoreParams) )
+        {
+            $this->query->where( PHP_EOL. "m.manufacturer_id IN ( " . implode( ',', $this->manufacturer_ids ).' ) ' )   ;
+        }#END IF
+
+        $limit = ($this->format == 'json' ? 15 : $limit ) ;
+        $this->db->setQuery($this->query, 0, $limit );
+
+
+
+        /*echo'<pre>';print_r( $this->query->dump() );echo'</pre>'.__FILE__.' '.__LINE__;
+        die(__FILE__ .' '. __LINE__ );*/
+
+
+
         try
         {
-            if( TWO_LANG_DEBUG )
-                $this->profiler->mark('onContentSearch (Before loadObjectList '.$context.')');
-
-
             $resArrRows = $this->db->loadObjectList('slug');
-
-            if( TWO_LANG_DEBUG )
-            {
-                $this->profiler->mark('onContentSearch (After loadObjectList '.$context.')');
-                echo 'Query Dump :' . __FILE__ . ' Line:' . __LINE__ . $this->query->dump();
-            }
-            // throw new Exception('Code Exception '.__FILE__.':'.__LINE__) ;
         } catch (Exception $e)
         {
             // Executed only in PHP 5, will not be reached in PHP 7
             echo 'Выброшено исключение: ', $e->getMessage(), "\n";
-            echo '<pre>';
-            print_r($e);
-            echo '</pre>' . __FILE__ . ' ' . __LINE__;
+            echo '<pre>'; print_r($e); echo '</pre>' . __FILE__ . ' ' . __LINE__;
             die(__FILE__ . ' ' . __LINE__);
         }
+
+        if( $this->profiler )  $this->profiler->mark('onContentSearch (After loadObjectList '.$context.')');  #END IF
+        $this->QueryDump =  strip_tags( $this->query->dump() ) ;
+
         return $resArrRows;
+    }
+
+    /**
+     * Точка входа Ajax
+     *
+     * @throws Exception
+     * @since 3.9
+     * @author Gartes
+     * @creationDate 2020-04-30, 16:59
+     * @see {url : https://docs.joomla.org/Using_Joomla_Ajax_Interface/ru }
+     */
+    public function onAjaxJoomshopping_two_lang ()
+    {
+        $arrInp = [
+            'option' =>  'com_search' ,
+            'view' =>  'search' ,
+            'start' =>  0 ,
+            'category_id' =>  'INT' ,
+            'searchphrase' => 'WORD' ,
+            'ordering' => 'WORD' ,
+            'limit' => 'INT' ,
+            'searchword' => 'STRING' ,
+            'areas' => 'ARRAY' ,
+//            'arrSearchResult' => 'STRING' ,
+            'task' => 'STRING' ,
+            'method' => 'STRING' ,
+        ];
+
+        $arr = $this->app->input->getArray( $arrInp );
+        /**
+         * @var STRING $ordering
+         * @var INT $limit
+         * @var STRING $searchword
+         * @var STRING $areas
+         * @var array $arrSearchResult
+         * @var STRING $task
+         * @var STRING $method
+         */
+        extract($arr) ;
+        $this->searchword = $searchword ;
+
+        $Helper = \JoomshoppingTwoLang\Helpers\Helper::instance( $this->_name , $this->_type , $this->params );
+
+        /**
+         * Методы для Helper
+         */
+        if ( !empty( $method ) ) {
+
+            $res =  $Helper->{$method}() ;
+            try
+            {
+                // Code that may throw an Exception or Error.
+                echo new \Joomla\CMS\Response\JsonResponse( $res );
+                // throw new Exception('Code Exception '.__FILE__.':'.__LINE__) ;
+            }
+            catch (Exception $e)
+            {
+                echo'<pre>';print_r( $res );echo'</pre>'.__FILE__.' '.__LINE__;
+                
+                // Executed only in PHP 5, will not be reached in PHP 7
+                echo 'Выброшено исключение: ',  $e->getMessage(), "\n";
+                echo'<pre>';print_r( $e );echo'</pre>'.__FILE__.' '.__LINE__;
+                die(__FILE__ .' '. __LINE__ );
+            }
+
+            die();
+        }#END IF
+
+
+
+
+
+        # Проверить слово на соответствие системной команде
+        if (TWO_LANG_DEBUG && $Helper->checkSystemCommand( $this->searchword ) ) {
+            $command = \GNZ11\Document\Text::camelCase($searchword, []);
+
+            return $Helper->{$command}();
+
+            echo new \Joomla\CMS\Response\JsonResponse( [] );
+            die();
+        }
+
+        # для операции - Получение ссылок для товаров и категорий
+        if( $task == 'getSefLink' )
+        {
+            $retRequest = [] ;
+            $arrSearchResult = $this->app->input->get('arrSearchResult' , false , 'RAW' ) ;
+            $Registry = new Joomla\Registry\Registry();
+            $products =  $Registry->loadString((string)$arrSearchResult)->get('products.list') ;
+            $categorys =  $Registry->loadString((string)$arrSearchResult)->get('categorys') ;
+            $show_all =  $Registry->loadString((string)$arrSearchResult)->get('show_all') ;
+
+            # Ссылка - Все результаты поиска
+            $retRequest['show_all'] = $this->getLinkResult($isSef = true , $addParamsArr=[] ) ;
+            foreach ($categorys as $id=>&$category)
+            {
+                # Ссылка для перехода в категорию
+                $category->href = $this->SEFLink( $category->href , 1) ;
+                # Сосздать ссылку Поиск в категории
+                $category->hrefSearchInCategory = $this->getLinkResult( true , ['category_id[]'=>$id ,'searchword'=>$this->searchword ] ) ;
+            }#END FOREACH
+
+            $retRequest['categorys'] = $categorys ;
+
+            foreach ($products as &$product)
+            {
+                $product->link = $this->SEFLink( $product->link , 1) ;
+            }#END FOREACH
+            $retRequest['products'] = $products ;
+
+
+            echo new \Joomla\CMS\Response\JsonResponse( $retRequest );
+            die();
+        }#END IF
+
+        # Найти товары
+        $this->product = $this->onContentSearch( $searchword ,    $ordering  , $areas );
+
+        # Получить ссылку на все результаты поиска
+        $this->allResultLink = $this->getLinkResult( );
+
+        $res['products']['list'] = $this->product ;
+        $res['products']['html'] = $this->loadTemplate('products' ) ;
+        $res['categorys'] = $this->categorys;
+        $res['manufacturers'] = $this->manufacturers;
+        $res['show_all'] = $this->allResultLink ;
+        // $this->app->set('joomshopping_categorys_search', $this->categorys);
+
+
+
+        if( TWO_LANG_DEBUG ) {
+            $res['debug']['profiler'] =  $this->profilerBuffer ;
+            $res['debug']['QueryDump'] =  $this->QueryDump ;
+        }
+
+        echo new \Joomla\CMS\Response\JsonResponse( $res );
+        die();
+
+
+         /*
+
+        JLoader::registerNamespace( 'GNZ11', JPATH_LIBRARIES . '/GNZ11', $reset = false, $prepend = false, $type = 'psr4' );
+
+
+        $helper = \CountryFilter\Helpers\Helper::instance( $this->params );
+        $task = $this->app->input->get( 'task', null, 'STRING' );
+
+        try
+        {
+            // Code that may throw an Exception or Error.
+            $results = $helper->$task();
+        } catch (Exception $e)
+        {
+            $results = $e;
+        }
+        return $results;*/
+    }
+
+    /**
+     * Получить ссылку на все результаты поиска
+     * @param bool $isSef true - если нужна sef ссылка
+     * @param array $addParamsArr
+     * @return string
+     * @since 3.9
+     * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
+     * @date 29.08.2020 01:08
+     */
+    protected function getLinkResult($isSef = false , $addParamsArr=[] ){
+        $arrInp = [
+            'start' =>  0 ,
+            // 'category_id' =>  'INT' ,
+            'searchphrase' => 'WORD' ,
+            'ordering' => 'WORD' ,
+            'limit' => 'INT' ,
+            'searchword' => 'STRING' ,
+//            'areas' => 'ARRAY' ,
+        ];
+        $params = $this->app->input->getArray($arrInp);
+
+        # Параметры запроса
+        $params['option'] = 'com_search';
+        $params['view'] = 'search';
+        $params = array_merge( $params , $addParamsArr ) ;
+        return $this->createLink($params, $isSef);
+    }
+
+
+    /**
+     * Загрузите файл макета плагина. Эти файлы могут быть переопределены с помощью стандартного Joomla! Шаблон
+     *
+     * Переопределение :
+     *                  JPATH_THEMES . /html/plg_{TYPE}_{NAME}/{$layout}.php
+     *                  JPATH_PLUGINS . /{TYPE}/{NAME}/tmpl/{$layout}.php
+     *                  or default : JPATH_PLUGINS . /{TYPE}/{NAME}/tmpl/default.php
+     *
+     *
+     * переопределяет. Load a plugin layout file. These files can be overridden with standard Joomla! template
+     * overrides.
+     *
+     * @param string $layout The layout file to load
+     * @param array  $params An array passed verbatim to the layout file as the `$params` variable
+     *
+     * @return  string  The rendered contents of the file
+     *
+     * @since   5.4.1
+     */
+    private function loadTemplate ( $layout = 'default' )
+    {
+        $path = \Joomla\CMS\Plugin\PluginHelper::getLayoutPath(  $this->_type , $this->_name , $layout );
+        // Render the layout
+        ob_start();
+        include $path;
+        return ob_get_clean();
+    }
+
+    /**
+     * Переворот расскладки клавиатуры
+     * @param string $text_inRu
+     * @param string $text
+     * @param string $text_inEn
+     * @return string
+     * @since 3.9
+     * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
+     * @date 08.09.2020 01:49
+     *
+     */
+    private function textRuEnValidation(string $text_inRu, string $text, string $text_inEn): string
+    {
+        # Поиск в поле название товара
+        if ($text_inRu != $text)
+        {
+            $addTextString = $text_inRu;
+        } else
+        {
+            $addTextString = $text_inEn;
+        }
+        return $addTextString;#END IF
+    }
+
+    /**
+     *
+     * @param string $text
+     * @param string $addTextString
+     * @param array $_q_name_ru
+     * @param array $_q_keyword
+     * @param array $whereArr
+     * @return array
+     * @since 3.9
+     * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
+     * @date 08.09.2020 01:55
+     *
+     */
+    private function buildQueryFullText(string $text, string $addTextString ): array
+    {
+        $whereArr = [] ;
+        $_q_name_ru = $this->db->quoteName('prod.name_ru-RU');
+        $_q_keyword = $this->db->quoteName('prod.meta_keyword_ru-RU');
+
+        $_fArr = [ ' ' , '-' , '*' ];
+        $_replaceArr = [ '>' , '>' , '' ];
+        $text = str_replace( $_fArr , $_replaceArr , $text );
+        $addTextString = str_replace( $_fArr , $_replaceArr , $addTextString );
+
+        # Cодержание оператора AGAINST
+        $_againstText = $this->db->quote(
+            $text .
+            ($addTextString?' ' . $addTextString:'') .
+            ($this->reduction?' ' . $this->reduction:'')
+        );
+
+
+
+//        echo'<pre>';print_r( $_againstText );echo'</pre>'.__FILE__.' '.__LINE__;
+
+
+        # Содержание оператора MATCH
+        $_matchText = $_q_name_ru . ',' . $_q_keyword;
+        $this->query->select("MATCH (" . $_matchText . ") AGAINST (" . $_againstText . " IN BOOLEAN MODE ) AS score " . PHP_EOL);
+        $this->query->order($this->db->quoteName('score') . ' DESC ');
+
+        $whereArr[] = "MATCH (" . $_matchText . ") AGAINST (" . $_againstText . " IN BOOLEAN MODE ) " . PHP_EOL;
+
+
+
+
+
+        $this->resArrRows = $this->getResult($whereArr , 'FULLTEXT' );
+        return $this->resArrRows;
     }
 
 
 
 
 }
+
+
+
 
 
 

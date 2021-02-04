@@ -305,9 +305,37 @@ div#Statistic span {
     position: absolute;
     top: 2px;
     right: 83px;
-    z-index: 10000;
+    z-index: 300;
 }
-
+@media only screen and (max-width: 1280px) {
+    .search-form__clear[_ngcontent-c9] {
+        display: -webkit-box;
+        display: -ms-flexbox;
+        display: flex;
+        -webkit-box-orient: horizontal;
+        -webkit-box-direction: normal;
+        -ms-flex-direction: row;
+        flex-direction: row;
+        -ms-flex-negative: 0;
+        flex-shrink: 0;
+        -webkit-box-align: center;
+        -ms-flex-align: center;
+        align-items: center;
+        -webkit-box-pack: center;
+        -ms-flex-pack: center;
+        justify-content: center;
+        width: 25px;
+        height: 25px;
+        padding: 0;
+        border: none;
+        background: #fff;
+        cursor: pointer;
+        position: absolute;
+        top: 2px;
+        right: 60px;
+        z-index: 300;
+    }
+}
 form.empty-form button.search-form__clear {
     display: none;
 }

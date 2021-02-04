@@ -26,7 +26,8 @@
 use Joomla\CMS\Factory;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Profiler\Profiler;
-use Joomla\CMS\Router\Route;
+    use Joomla\CMS\Response\JsonResponse;
+    use Joomla\CMS\Router\Route;
 use Joomla\CMS\User\User;
 use Joomla\String\StringHelper;
 
@@ -40,6 +41,13 @@ jimport('joomla.plugin.plugin');
 /*JPlugin::loadLanguage( 'plg_search_joomshopping' );*/
 
 class plgSearchJoomshopping_two_lang extends CMSPlugin {
+
+    public static $self ;
+    /**
+     * @var INT Уровень отображения ошибок до инициализации _init_error_reporting()
+     * @since 3.9
+     */
+    private $errorlevel ;
 
     /**
      * @var JDatabaseDriver|null
@@ -183,6 +191,16 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      */
     public function __construct(&$subject, $config = array())
     {
+        parent::__construct($subject, $config ) ;
+
+        if ( !defined('TWO_LANG_DEBUG') ) define( 'TWO_LANG_DEBUG' , $this->params->get( 'debug_on' , 0 ) );
+//        if ( !defined('TWO_LANG_DEBUG') ) define( 'TWO_LANG_DEBUG' , 1 );
+
+
+        if( TWO_LANG_DEBUG ) {
+            $profiler = \Joomla\CMS\Profiler\Profiler::getInstance('PRO_Application');
+            $profiler->mark('plgSearchJoomshopping_two_lang Start :: __construct');
+        }
 
 
         
@@ -203,9 +221,9 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         $this->lang =   JSFactory::getLang();
         $this->HelperString = \JoomshoppingTwoLang\Helpers\HelperString::instance();
 
-        parent::__construct($subject, $config ) ;
 
-        if ( !defined('TWO_LANG_DEBUG') ) define( 'TWO_LANG_DEBUG' , $this->params->get( 'debug_on' , 0 ) );
+
+
 
         # Инициализация отображение яровня ошибок во время работы скрипта
         if( TWO_LANG_DEBUG ) {
@@ -221,12 +239,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         $self = $this ;
 
     }
-    public static $self ;
-    /**
-     * @var INT Уровень отображения ошибок до инициализации _init_error_reporting()
-     * @since 3.9
-     */
-    private $errorlevel ;
+
 
     /**
      * Инициализация отображение яровня ошибок во время работы скрипта
@@ -386,8 +399,18 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         preg_match_all( $StopSymbolsPattern , $text_inEn , $out_inEn , PREG_OFFSET_CAPTURE ) ;
         $text_inEn = ( !count($out_inEn[0] )  ? $text_inEn : null ) ;
 
-        # Переворот расскладки клавиатуры
-        $addTextString = $this->textRuEnValidation($text_inRu, $text, $text_inEn);#END IF
+
+
+        $addTextString = $text  ;
+        if (!empty( $text_inEn )) {
+            # Переворот расскладки клавиатуры
+            $addTextString = $this->textRuEnValidation($text_inRu, $text, $text_inEn); #END IF
+        }#END IF
+
+
+
+
+
 
         # если $text - это число - будем в начале искать в артикулах товара
         if( self::checkIs_numeric($text) )
@@ -948,14 +971,17 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
     }
 
     /**
-     * Установка уловий WHERE и поиск в НАЗВАНИЯХ и KEYWORDS товара
+     * Установка условий WHERE и поиск в НАЗВАНИЯХ и KEYWORDS товара
+     *
      * @param string $text
      * @param string $text_inRu
      * @param string $text_inEn
+     *
      * @return array|false
-     * @since 3.9
+     * @throws Exception
+     * @since  3.9
      * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
-     * @date 17.08.2020 17:58
+     * @date   17.08.2020 17:58
      *
      */
     private function getWhereProductName(  string $text , string $addTextString )
@@ -1199,6 +1225,12 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      */
     public function onAjaxJoomshopping_two_lang ()
     {
+        if( TWO_LANG_DEBUG ) {
+            $profiler = \Joomla\CMS\Profiler\Profiler::getInstance('PRO_Application');
+            $profiler->mark('onAjax Start :: onAjaxJoomshopping_two_lang');
+        }
+
+
         $arrInp = [
             'option' =>  'com_search' ,
             'view' =>  'search' ,
@@ -1217,10 +1249,10 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         $arr = $this->app->input->getArray( $arrInp );
         /**
          * @var STRING $ordering
-         * @var INT $limit
+         * @var INT    $limit
          * @var STRING $searchword
          * @var STRING $areas
-         * @var array $arrSearchResult
+         * @var array  $arrSearchResult
          * @var STRING $task
          * @var STRING $method
          */
@@ -1238,7 +1270,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
             try
             {
                 // Code that may throw an Exception or Error.
-                echo new \Joomla\CMS\Response\JsonResponse( $res );
+                echo new JsonResponse( $res );
                 // throw new Exception('Code Exception '.__FILE__.':'.__LINE__) ;
             }
             catch (Exception $e)
@@ -1264,7 +1296,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
             return $Helper->{$command}();
 
-            echo new \Joomla\CMS\Response\JsonResponse( [] );
+            echo new JsonResponse( [] );
             die();
         }
 
@@ -1280,48 +1312,102 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
             # Ссылка - Все результаты поиска
             $retRequest['show_all'] = $this->getLinkResult($isSef = true , $addParamsArr=[] ) ;
-            foreach ($categorys as $id=>&$category)
+            
+
+
+            $retRequest['categorys'] = [] ;
+            if ( !empty($categorys) )
             {
-                # Ссылка для перехода в категорию
-                $category->href = $this->SEFLink( $category->href , 1) ;
-                # Сосздать ссылку Поиск в категории
-                $category->hrefSearchInCategory = $this->getLinkResult( true , ['category_id[]'=>$id ,'searchword'=>$this->searchword ] ) ;
-            }#END FOREACH
 
-            $retRequest['categorys'] = $categorys ;
+                foreach ($categorys as $id=>&$category)
+                {
+                    # Ссылка для перехода в категорию
+                    $category->href = $this->SEFLink( $category->href , 1) ;
+                    # Создать ссылку Поиск в категории
+                    $category->hrefSearchInCategory = $this->getLinkResult( true , ['category_id[]'=>$id ,'searchword'=>$this->searchword ] ) ;
+                }#END FOREACH
+                $retRequest['categorys'] = $categorys ;
+            }#END IF
 
-            foreach ($products as &$product)
+
+            $retRequest['products'] = [] ;
+            if ( !empty($products) )
             {
-                $product->link = $this->SEFLink( $product->link , 1) ;
-            }#END FOREACH
-            $retRequest['products'] = $products ;
+                foreach ($products as &$product)
+                {
+                    $product->link = $this->SEFLink( $product->link , 1) ;
+                }#END FOREACH
+                $retRequest['products'] = $products ;
+            }#END IF
 
 
-            echo new \Joomla\CMS\Response\JsonResponse( $retRequest );
+
+            echo new JsonResponse( $retRequest );
             die();
         }#END IF
 
-        # Найти товары
-        $this->product = $this->onContentSearch( $searchword ,    $ordering  , $areas );
+        $_group_cache = 'plgJoomshopping_two_lang' ;
+        $cache = Factory::getCache( $_group_cache , '');
+        $cache->setCaching(true);
+        $cachePartKey = [] ;
+        $cachePartKey[] =  $searchword ;
+        $cachePartKey[] =  $ordering ;
+        $cachePartKey[] =  $areas ;
+        $cacheKey = md5( json_encode($cachePartKey) ) ;
 
-        # Получить ссылку на все результаты поиска
-        $this->allResultLink = $this->getLinkResult( );
+        if( TWO_LANG_DEBUG ) {
+            $profiler->mark('before Get Cache');
+        }
 
-        $res['products']['list'] = $this->product ;
-        $res['products']['html'] = $this->loadTemplate('products' ) ;
-        $res['categorys'] = $this->categorys;
-        $res['manufacturers'] = $this->manufacturers;
-        $res['show_all'] = $this->allResultLink ;
-        // $this->app->set('joomshopping_categorys_search', $this->categorys);
+
+        if(   !$res = $cache->get($cacheKey)  )
+        {
+
+
+
+            # Найти товары
+            $this->product = $this->onContentSearch( $searchword ,    $ordering  , $areas );
+
+            # Получить ссылку на все результаты поиска
+            $this->allResultLink = $this->getLinkResult( );
+
+            $res['products']['html'] = null ;
+            $res['products']['list'] = $this->product ;
+            if (!empty($this->product))
+            {
+                $res['products']['html'] = $this->loadTemplate('products' ) ;
+            }#END IF
+
+            $res['categorys'] = $this->categorys;
+            $res['manufacturers'] = $this->manufacturers;
+            $res['show_all'] = $this->allResultLink ;
+            // $this->app->set('joomshopping_categorys_search', $this->categorys);
+
+            $cache->store( $res , $cacheKey , $_group_cache );
+
+
+
+
+        }#END IF
+
+
+
+
+
 
 
 
         if( TWO_LANG_DEBUG ) {
+            $profiler->mark('After Get Cache');
             $res['debug']['profiler'] =  $this->profilerBuffer ;
+            $res['debug']['profiler'] =  $profiler->getBuffer(); ;
             $res['debug']['QueryDump'] =  $this->QueryDump ;
         }
+        
 
-        echo new \Joomla\CMS\Response\JsonResponse( $res );
+
+        
+        echo new JsonResponse( $res );
         die();
 
 

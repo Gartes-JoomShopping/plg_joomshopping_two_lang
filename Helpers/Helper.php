@@ -118,6 +118,22 @@ class Helper
     }
 
     /**
+     * @param array $options
+     *
+     * @return Helper
+     * @throws Exception
+     * @since 3.9
+     */
+    public static function instance( $_name=null , $_type=null , $options = array())
+    {
+        if( self::$instance === null )
+        {
+            self::$instance = new self($_name , $_type , $options);
+        }
+        return self::$instance;
+    }
+
+    /**
      * добавить слово в словарь
      * @param array $WORDS_ARR [ 'word' , 'transcription' ]
      * @since 3.9
@@ -168,21 +184,7 @@ class Helper
         }
     }
 
-    /**
-     * @param array $options
-     *
-     * @return Helper
-     * @throws Exception
-     * @since 3.9
-     */
-    public static function instance( $_name=null , $_type=null , $options = array())
-    {
-        if( self::$instance === null )
-        {
-            self::$instance = new self($_name , $_type , $options);
-        }
-        return self::$instance;
-    }
+
 
     public function LoadHistoryTemplate(){
         $ARR = $this->app->input->getArray(['DB'=>['__history'=>'ARRAY']]);
@@ -196,7 +198,8 @@ class Helper
             $this->db->quoteName('redirect'),
             $this->db->quoteName('hits'),
         ];
-        $Query->select($select)->from( $this->db->quoteName('#__plg_joomshopping_two_lang'));
+        $Query->select($select)
+            ->from( $this->db->quoteName('#__plg_joomshopping_two_lang'));
         $Query->where( $this->db->quoteName('word') ." IN ('". implode( "','" , $this->keysHistory ) ."')" );
         $this->db->setQuery($Query);
 
@@ -416,20 +419,18 @@ class Helper
 
     private $RetSysData = [];
     /**
-     * Системная комманда - Создать словарь
+     * Системная команда - Создать словарь
      * @since 3.9
      * @auhtor Gartes | sad.net79@gmail.com | Skype : agroparknew | Telegram : @gartes
      * @date 31.08.2020 20:45
      *
      */
-    public function createDictionary(){
+    public function createDictionary(): array
+    {
         $DB = $this->app->input->getArray( [ 'DB' => 'ARRAY' ] );
         $offset = $DB['DB']['offset'];
         $step = $DB['DB']['step'] ? $DB['DB']['step']:25 ;
         $this->RetSysData['countingAllProducts'] = $DB['DB']['countingAllProducts']>0?$DB['DB']['countingAllProducts']:self::countingAllProducts();
-
-
-
 
         $this->RetSysData['offset'] = $offset ;
         $this->RetSysData['command'] = '*create dictionary' ;

@@ -281,6 +281,8 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      */
     protected function createLink(array $params, bool $isSef = false ): string
     {
+
+        JLoader::registerNamespace( 'GNZ11' , JPATH_LIBRARIES . '/GNZ11' , $reset = false , $prepend = false , $type = 'psr4' );
         return \GNZ11\Joomla\Uri\Uri::createLink( $params,  $isSef );
 
     }

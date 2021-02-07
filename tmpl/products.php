@@ -67,6 +67,10 @@ extract($arr) ;
                     $priceClass = '';
                 }#END IF
 
+
+
+
+
                 ?>
 
                 <li _ngcontent-c9="" redirect="1" class="search-suggest__item" data-prod_id="<?= $product->slug ?>"
@@ -84,6 +88,7 @@ extract($arr) ;
                             <!---->
             </span>
                         <input type="button" class="button_buy" title="Купить <?= $product->title ?>" value="Купить">
+                        <div class="p-squ" title="Код: <?= $product->product_ean ?>">Код: <?= $product->product_ean ?></div>
                     </a>
                 </li>
 

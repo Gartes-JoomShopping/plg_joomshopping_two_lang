@@ -335,7 +335,8 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
     public $ignoreParams = [] ;
 
     /**
-     * @param $text
+     * Поиск по тексту
+     * @param string $text - Строка запроса
      * @param string $phrase
      * @param string $ordering
      * @param null $areas
@@ -345,25 +346,23 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
      * @throws Exception
      * @since version
      */
-    function onContentSearch( $text,   $ordering = '', $areas = null , $ignoreParams = [] )
+    function onContentSearch( $text = null,   $ordering = '', $areas = null , $ignoreParams = [] )
     {
 
+        if( !$text )
+        {
+            $text = $this->app->input->get('searchword' , '' , 'RAW') ;
+        }#END IF
 
-        
-        
-        $text = $this->app->input->get('searchword' , '' , 'RAW') ;
         if ($ignoreParams)
         {
             $this->ignoreParams = $ignoreParams ;
         }#END IF
 
-
-
         if ($text == '') return array();
         $this->ordering = $ordering ;
 
-
-        # Проверка что ищим в допустимом компоненте
+        # Проверка что ищем в допустимом компоненте
         if (is_array($areas)) {
             # array_intersect — Вычисляет схождение массивов
             if (  !array_intersect($areas, array_keys( $this->onContentSearchAreas() )  )  ) {
@@ -371,13 +370,11 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
             }
         }
 
-
+        # Если включено профилирование
         if( $this->profiler  ) $this->profiler->mark('Before setSetting Line ' . __LINE__ ); #END IF
 
         # Установить настройки плагина в глобальные переменные класса
         $this->setSetting() ;
-
-
 
 
         # Получить тело основного запроса
@@ -411,17 +408,27 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
 
 
-
-
+        // Проверяем на ведущие нули
+        preg_match('/^(000)/', $text , $matches /*, PREG_OFFSET_CAPTURE*/);
 
         # если $text - это число - будем в начале искать в артикулах товара
-        if( self::checkIs_numeric($text) )
+        if( self::checkIs_numeric($text) && !empty( $matches ) )
         {
+//            echo'<pre>';print_r( $matches );echo'</pre>'.__FILE__.' '.__LINE__ . PHP_EOL;
+//            die(__FILE__ .' '. __LINE__ );
+
+
             /**
              * Установка уловий WHERE и поиск в КОДАХ товара
              * @returns  $this->resArrRows
              */
             $this->resArrRows = $this->getWhereProductEan($text, $text_inRu, $text_inEn);
+
+
+
+
+
+
         }
         else
         {
@@ -799,8 +806,8 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
         # Способ выборки описания :
         # 0 - Добавить краткое описание к полному
-        # 1 - Только краткое описани
-        # 2 - Только полное  описани
+        # 1 - Только краткое описание
+        # 2 - Только полное  описание
         switch ($this->search_description)
         {
             case 1:
@@ -839,6 +846,8 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
         # Исключение категорий
         $this->query = $this->getWhereExcludeCategorys( $this->query );
+
+
 
 
 
@@ -927,7 +936,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         # Артикулах товара - совподение подстроки
         if( !is_numeric($textTestNum) )
         {
-            $whereArr[] = 'LOWER (product_ean) LIKE ' . $this->db->quote('%' . $text.'%') . PHP_EOL;
+            $whereArr[] = 'LOWER (product_ean) LIKE ' . $this->db->quote('%' . $text . '%') . PHP_EOL;
         }else {
 //            $whereArr[] = 'product_ean LIKE ' . $this->db->quote(/*'%' .*/ $text/*.'%'*/) . PHP_EOL;
         }#END IF
@@ -938,6 +947,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         {
             $whereArr[] = 'LOWER (product_ean) = ' . $this->db->quote($text_inRu) . PHP_EOL;
         }#END IF
+
         if( $text != $text_inEn && !is_numeric($textTestNum) )
         {
             $whereArr[] = 'LOWER (product_ean) = ' . $this->db->quote($text_inEn) . PHP_EOL;
@@ -947,6 +957,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         {
             $whereArr[] = 'LOWER (product_ean) LIKE ' . $this->db->quote('%' . $text_inRu . '%') . PHP_EOL;
         }#END IF
+
         if( $text_inEn && $text != $text_inEn && !is_numeric($textTestNum) )
         {
             $whereArr[] = 'LOWER (product_ean) LIKE ' . $this->db->quote('%' . $text_inEn . '%') . PHP_EOL;
@@ -1192,10 +1203,18 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         $limit = ($this->format == 'json' ? 15 : $limit ) ;
         $this->db->setQuery($this->query, 0, $limit );
 
+        // Если поиск в артикулах товара
+        if( $context == 'ProductEan' )
+        {
+            # Очистить всю  сортировку
+            $this->query->clear('order');
+            # Устанавливаем сортировать только по артикулу
+            $this->query->order('prod.product_ean ASC'  );
+        }#END IF
 
 
-        /*echo'<pre>';print_r( $this->query->dump() );echo'</pre>'.__FILE__.' '.__LINE__;
-        die(__FILE__ .' '. __LINE__ );*/
+
+//        die(__FILE__ .' '. __LINE__ );
 
 
 
@@ -1233,6 +1252,7 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         }
 
 
+
         $arrInp = [
             'option' =>  'com_search' ,
             'view' =>  'search' ,
@@ -1262,6 +1282,10 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
         $this->searchword = $searchword ;
 
         $Helper = \JoomshoppingTwoLang\Helpers\Helper::instance( $this->_name , $this->_type , $this->params );
+
+
+
+
 
         /**
          * Методы для Helper
@@ -1298,8 +1322,8 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
             return $Helper->{$command}();
 
-            echo new JsonResponse( [] );
-            die();
+
+
         }
 
         # для операции - Получение ссылок для товаров и категорий
@@ -1348,18 +1372,22 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
             die();
         }#END IF
 
+
+
+
         $_group_cache = 'plgJoomshopping_two_lang' ;
         $cache = Factory::getCache( $_group_cache , '');
-        $cache->setCaching(true);
+        $cache->setCaching( $this->params->get('queryCacheWord' , true ) );
         $cachePartKey = [] ;
         $cachePartKey[] =  $searchword ;
         $cachePartKey[] =  $ordering ;
         $cachePartKey[] =  $areas ;
         $cacheKey = md5( json_encode($cachePartKey) ) ;
 
-        if( TWO_LANG_DEBUG ) {
-            $profiler->mark('before Get Cache');
-        }
+
+
+
+        if( TWO_LANG_DEBUG ) { $profiler->mark('before Get Cache'); }
 
 
         if(   !$res = $cache->get($cacheKey)  )
@@ -1369,6 +1397,10 @@ class plgSearchJoomshopping_two_lang extends CMSPlugin {
 
             # Найти товары
             $this->product = $this->onContentSearch( $searchword ,    $ordering  , $areas );
+
+
+
+
 
             # Получить ссылку на все результаты поиска
             $this->allResultLink = $this->getLinkResult( );

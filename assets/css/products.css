@@ -168,6 +168,15 @@ ul.suggest-list.search-suggest-product+ul {
     right: 7px;
     width: 100px;
 }
+.p-squ{
+    position: absolute;
+    right: 9px;
+    top: 17px;
+    background: #efefef;
+    padding: 1px 5px;
+}
+
+
 
 /* ====================  Scroll Bar  ==================== */
 /* width */

@@ -7,7 +7,7 @@
     <license>Open Source License, GNU GPL</license>
     <authorEmail>sad.net79@gmail.com</authorEmail>
     <authorUrl>https://back-end.ga/</authorUrl>
-    <version>0.1.0</version>
+    <version>0.1.2</version>
     <description>Search plugin joomshopping two languages</description>
     <files>
         <folder>assets</folder>
@@ -30,7 +30,22 @@
                 	path_xml="/plugins/search/joomshopping_two_lang/joomshopping_two_lang.xml"
                 	class="__v"
                 	filter="raw" />
-
+                
+                <field name="queryCacheWord"
+                	type="radio"
+                	default="1"
+                	readonly="0"
+                	label="JOOMSHOPPING_TWO_LANG_QUERY_CACHE_WORD"
+                	description="JOOMSHOPPING_TWO_LANG_QUERY_CACHE_WORD_DESC"
+                	class="btn-group btn-group-yesno"
+                	showon=""
+                	 
+                	>
+                	<option value="1">JYES</option>
+                	<option value="0">JNO</option>
+                </field>
+                
+                 
 
                 <field name="exclude_categorys" type="text"
                        default=""
